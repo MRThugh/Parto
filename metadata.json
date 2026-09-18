@@ -1,0 +1,8 @@
+{
+  "name": "Parto — Lightweight Image Editor",
+  "description": "A fast, modern, and lightweight desktop image editor built with Python and PySide6.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

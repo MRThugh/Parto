@@ -1,0 +1,11 @@
+{
+  "name": "parto",
+  "version": "0.2.0",
+  "description": "Parto — Lightweight Desktop Image Editor",
+  "private": true,
+  "scripts": {
+    "build": "python3 -m py_compile main.py window.py editor.py image.py icons.py test_parto.py",
+    "lint": "python3 -m py_compile main.py window.py editor.py image.py icons.py test_parto.py",
+    "test": "pytest test_parto.py"
+  }
+}
