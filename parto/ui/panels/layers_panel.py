@@ -114,7 +114,9 @@ class LayersDock(QDockWidget):
         self.opacity_slider = QSlider(Qt.Horizontal, self)
         self.opacity_slider.setRange(0, 100)
         self.opacity_slider.setValue(100)
+        self.opacity_slider.sliderPressed.connect(self._on_opacity_slider_pressed)
         self.opacity_slider.valueChanged.connect(self._on_opacity_slider_changed)
+        self.opacity_slider.sliderReleased.connect(self._on_opacity_slider_released)
         op_layout.addWidget(self.opacity_slider)
 
         self.opacity_label = QLabel("100%", self)
@@ -256,11 +258,19 @@ class LayersDock(QDockWidget):
                 self.opacity_label.setText(f"{pct}%")
             self._updating = False
 
+    def _on_opacity_slider_pressed(self):
+        self._opacity_snap = self.document._create_snapshot()
+
     def _on_opacity_slider_changed(self, val: int):
         self.opacity_label.setText(f"{val}%")
         active = self.document.active_layer
         if active:
-            self.document.set_layer_opacity(self.document.active_layer_index, val / 100.0)
+            self.document.set_layer_opacity(self.document.active_layer_index, val / 100.0, record_history=False)
+
+    def _on_opacity_slider_released(self):
+        if hasattr(self, "_opacity_snap") and self._opacity_snap is not None:
+            self.document._record_operation("Change Layer Opacity", self._opacity_snap)
+            self._opacity_snap = None
 
     def _on_add_layer(self):
         self.document.add_layer()

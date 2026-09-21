@@ -31,6 +31,7 @@ THEME_PALETTES: Dict[str, Dict[str, str]] = {
         "canvas_bg": "#121214",
         "canvas_checker_1": "#1a1a1c",
         "canvas_checker_2": "#222226",
+        "border_color": "#3f3f46",
     },
     "light": {
         "name": "Light",
@@ -56,6 +57,7 @@ THEME_PALETTES: Dict[str, Dict[str, str]] = {
         "canvas_bg": "#e4e4e8",
         "canvas_checker_1": "#f4f4f6",
         "canvas_checker_2": "#e2e2e6",
+        "border_color": "#d4d4d8",
     },
     "graphite": {
         "name": "Graphite",
@@ -81,6 +83,7 @@ THEME_PALETTES: Dict[str, Dict[str, str]] = {
         "canvas_bg": "#1c1f24",
         "canvas_checker_1": "#25282e",
         "canvas_checker_2": "#2e323a",
+        "border_color": "#434956",
     },
     "midnight": {
         "name": "Midnight",
@@ -106,6 +109,7 @@ THEME_PALETTES: Dict[str, Dict[str, str]] = {
         "canvas_bg": "#070a12",
         "canvas_checker_1": "#0d1322",
         "canvas_checker_2": "#131b2e",
+        "border_color": "#1e293b",
     },
     "nord": {
         "name": "Nord",
@@ -131,6 +135,7 @@ THEME_PALETTES: Dict[str, Dict[str, str]] = {
         "canvas_bg": "#242933",
         "canvas_checker_1": "#2e3440",
         "canvas_checker_2": "#3b4252",
+        "border_color": "#4c566a",
     },
 }
 
@@ -147,7 +152,6 @@ def get_theme_stylesheet(theme_key: str = "dark") -> str:
         background-color: {p["bg"]};
         color: {p["text"]};
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        font-size: 13px;
     }}
 
     /* === MENU BAR & MENUS === */
@@ -422,14 +426,14 @@ def get_theme_stylesheet(theme_key: str = "dark") -> str:
         padding: 10px 18px;
     }}
 
-    /* === CROP BAR === */
-    QWidget#CropBar {{
+    /* === CROP BAR & BRUSH BAR === */
+    QWidget#CropBar, QWidget#BrushBar {{
         background-color: {p["surface"]};
         border: 1px solid {p["border"]};
         border-radius: 8px;
         padding: 4px 10px;
     }}
-    QWidget#CropBar QLabel {{
+    QWidget#CropBar QLabel, QWidget#BrushBar QLabel {{
         color: {p["text"]};
         font-weight: 500;
     }}
@@ -460,6 +464,34 @@ def get_theme_stylesheet(theme_key: str = "dark") -> str:
         color: {p["text_secondary"]};
     }}
     """
+
+
+def get_semantic_color(theme_or_palette: Any, key: str, default: str = "#ffffff") -> str:
+    """
+    Retrieve semantic color with support for theme name, palette dict, and key aliases.
+    """
+    if isinstance(theme_or_palette, str):
+        pal = THEME_PALETTES.get(theme_or_palette, THEME_PALETTES["dark"])
+    elif isinstance(theme_or_palette, dict):
+        pal = theme_or_palette
+    else:
+        pal = THEME_PALETTES["dark"]
+
+    aliases = {
+        "border_color": "border",
+        "border": "border_color",
+        "bg_color": "bg",
+        "background": "bg",
+        "text_color": "text",
+        "foreground": "text",
+    }
+
+    if key in pal:
+        return pal[key]
+    alt_key = aliases.get(key)
+    if alt_key and alt_key in pal:
+        return pal[alt_key]
+    return default
 
 
 THEMES = THEME_PALETTES

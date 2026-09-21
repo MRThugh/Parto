@@ -34,8 +34,7 @@ class EditorStatusBar(QStatusBar):
         get_theme_manager().theme_changed.connect(self._on_theme_changed)
 
     def _get_border_color(self) -> str:
-        pal = get_theme_manager().get_palette()
-        return pal.get("border_color", "#3f3f46")
+        return get_theme_manager().get_semantic_color("border", "#3f3f46")
 
     def _init_widgets(self):
         # 1. Cursor coordinate telemetry

@@ -13,6 +13,7 @@ from parto.ui.dialogs.command_palette import CommandPalette
 from parto.ui.dialogs.shortcuts_dialog import ShortcutsDialog
 from parto.ui.dialogs.about import AboutDialog
 from parto.ui.widgets.crop_bar import CropBar
+from parto.ui.widgets.brush_bar import BrushBar
 from parto.ui.widgets.welcome import WelcomeScreen
 from parto.ui.widgets.toast import Toast
 
@@ -25,6 +26,7 @@ __all__ = [
     "ShortcutsDialog",
     "AboutDialog",
     "CropBar",
+    "BrushBar",
     "WelcomeScreen",
     "Toast",
 ]

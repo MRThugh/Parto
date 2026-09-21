@@ -41,7 +41,7 @@ class EditorMenuBar:
         act_save_as = sm.register("file_save_as", "Save As...", "File", "Ctrl+Shift+S", "Save image to a new file", file_menu.addAction("Save As..."))
         act_save_as.action.triggered.connect(window.action_save_as)
 
-        act_export = sm.register("file_export", "Export As...", "File", "Ctrl+E", "Export image to WebP, JPEG, PNG, TIFF", file_menu.addAction("Export As..."))
+        act_export = sm.register("file_export", "Export As...", "File", "Ctrl+Shift+E", "Export image to WebP, JPEG, PNG, TIFF", file_menu.addAction("Export As..."))
         act_export.action.triggered.connect(window.action_export_image)
 
         file_menu.addSeparator()
@@ -69,10 +69,10 @@ class EditorMenuBar:
 
         edit_menu.addSeparator()
 
-        act_crop = sm.register("edit_crop", "Crop Tool", "Edit", "C", "Crop image canvas", edit_menu.addAction("Crop Tool"))
+        act_crop = sm.register("edit_crop", "Crop Canvas...", "Edit", "Shift+C", "Crop image canvas", edit_menu.addAction("Crop Canvas..."))
         act_crop.action.triggered.connect(window.action_tool_crop)
 
-        act_resize = sm.register("edit_resize", "Resize Image...", "Edit", "Ctrl+R", "Resize image dimensions", edit_menu.addAction("Resize Image..."))
+        act_resize = sm.register("edit_resize", "Resize Image...", "Edit", "Ctrl+Alt+I", "Resize image dimensions", edit_menu.addAction("Resize Image..."))
         act_resize.action.triggered.connect(window.action_resize_image)
 
         # ==========================================
@@ -100,17 +100,17 @@ class EditorMenuBar:
         view_menu.addSeparator()
 
         if hasattr(window, "layers_dock"):
-            act_tlayers = sm.register("view_layers", "Layers Panel", "View", "Ctrl+L", "Toggle Layers Panel", view_menu.addAction("Layers Panel"))
+            act_tlayers = sm.register("view_layers", "Layers Panel", "View", "F7", "Toggle Layers Panel", view_menu.addAction("Layers Panel"))
             act_tlayers.action.setCheckable(True)
             act_tlayers.action.setChecked(window.layers_dock.isVisible())
-            act_tlayers.action.triggered.connect(lambda checked: window.layers_dock.setVisible(checked))
+            act_tlayers.action.toggled.connect(window.layers_dock.setVisible)
             window.layers_dock.visibilityChanged.connect(act_tlayers.action.setChecked)
 
         if hasattr(window, "adjustments_dock"):
-            act_tadj = sm.register("view_adjustments", "Adjustments Panel", "View", "", "Toggle Live Adjustments Panel", view_menu.addAction("Adjustments Panel"))
+            act_tadj = sm.register("view_adjustments", "Adjustments Panel", "View", "F8", "Toggle Live Adjustments Panel", view_menu.addAction("Adjustments Panel"))
             act_tadj.action.setCheckable(True)
             act_tadj.action.setChecked(window.adjustments_dock.isVisible())
-            act_tadj.action.triggered.connect(lambda checked: window.adjustments_dock.setVisible(checked))
+            act_tadj.action.toggled.connect(window.adjustments_dock.setVisible)
             window.adjustments_dock.visibilityChanged.connect(act_tadj.action.setChecked)
 
         # ==========================================
@@ -118,13 +118,13 @@ class EditorMenuBar:
         # ==========================================
         image_menu = menu_bar.addMenu("&Image")
 
-        act_rcw = sm.register("img_rot_cw", "Rotate 90° Clockwise", "Image", "Ctrl+]", "Rotate 90 degrees right", image_menu.addAction("Rotate 90° Clockwise"))
+        act_rcw = sm.register("img_rot_cw", "Rotate 90° Clockwise", "Image", "Ctrl+R", "Rotate 90 degrees right", image_menu.addAction("Rotate 90° Clockwise"))
         act_rcw.action.triggered.connect(lambda: window.document.rotate_document(clockwise=True))
 
-        act_rccw = sm.register("img_rot_ccw", "Rotate 90° Counter-Clockwise", "Image", "Ctrl+[", "Rotate 90 degrees left", image_menu.addAction("Rotate 90° Counter-Clockwise"))
+        act_rccw = sm.register("img_rot_ccw", "Rotate 90° Counter-Clockwise", "Image", "Ctrl+Shift+R", "Rotate 90 degrees left", image_menu.addAction("Rotate 90° Counter-Clockwise"))
         act_rccw.action.triggered.connect(lambda: window.document.rotate_document(clockwise=False))
 
-        act_r180 = sm.register("img_rot_180", "Rotate 180°", "Image", "Ctrl+Shift+R", "Rotate upside down", image_menu.addAction("Rotate 180°"))
+        act_r180 = sm.register("img_rot_180", "Rotate 180°", "Image", "Ctrl+Alt+R", "Rotate upside down", image_menu.addAction("Rotate 180°"))
         act_r180.action.triggered.connect(window.document.rotate_180_document)
 
         image_menu.addSeparator()
@@ -132,8 +132,22 @@ class EditorMenuBar:
         act_fliph = sm.register("img_flip_h", "Flip Horizontal", "Image", "Ctrl+H", "Flip canvas left to right", image_menu.addAction("Flip Horizontal"))
         act_fliph.action.triggered.connect(window.document.flip_horizontal_document)
 
-        act_flipv = sm.register("img_flip_v", "Flip Vertical", "Image", "Ctrl+Alt+V", "Flip canvas top to bottom", image_menu.addAction("Flip Vertical"))
+        act_flipv = sm.register("img_flip_v", "Flip Vertical", "Image", "Ctrl+Shift+H", "Flip canvas top to bottom", image_menu.addAction("Flip Vertical"))
         act_flipv.action.triggered.connect(window.document.flip_vertical_document)
+
+        image_menu.addSeparator()
+
+        rb_action = image_menu.addAction("Remove Background")
+        rb_act = sm.register(
+            "img_remove_bg",
+            "Remove Background",
+            "Image",
+            "Ctrl+Shift+B",
+            "Automatically remove image background with edge feathering",
+            rb_action,
+        )
+        rb_act.action.triggered.connect(lambda: window.apply_remove_background(28, 2))
+
 
         # ==========================================
         # 5. LAYERS MENU
@@ -157,7 +171,7 @@ class EditorMenuBar:
         act_mdn = sm.register("layer_dn", "Move Layer Down", "Layers", "Ctrl+Down", "Move layer lower in stack", layers_menu.addAction("Move Layer Down"))
         act_mdn.action.triggered.connect(window.document.move_layer_down)
 
-        act_mrg = sm.register("layer_mrg", "Merge Down", "Layers", "Ctrl+M", "Merge active layer into layer below", layers_menu.addAction("Merge Down"))
+        act_mrg = sm.register("layer_mrg", "Merge Down", "Layers", "Ctrl+E", "Merge active layer into layer below", layers_menu.addAction("Merge Down"))
         act_mrg.action.triggered.connect(window.document.merge_down)
 
         # ==========================================
@@ -182,7 +196,7 @@ class EditorMenuBar:
         # ==========================================
         tools_menu = menu_bar.addMenu("&Tools")
 
-        act_tmove = sm.register("tool_move", "Pan / Hand Tool", "Tools", "H", "Pan canvas view", tools_menu.addAction("Pan / Hand Tool"))
+        act_tmove = sm.register("tool_move", "Pan / Move Tool", "Tools", "V", "Pan canvas view", tools_menu.addAction("Pan / Move Tool"))
         act_tmove.action.triggered.connect(window.action_tool_move)
 
         act_tcrop = sm.register("tool_crop", "Crop Tool", "Tools", "C", "Crop canvas geometry", tools_menu.addAction("Crop Tool"))
@@ -207,7 +221,7 @@ class EditorMenuBar:
             tact.setCheckable(True)
             if tid == current_theme:
                 tact.setChecked(True)
-            tact.triggered.connect(lambda _, t=tid: get_theme_manager().set_theme(t))
+            tact.triggered.connect(lambda _, t=tid: get_theme_manager().transition_theme(t, window=window, duration_ms=200))
             theme_group.addAction(tact)
             theme_menu.addAction(tact)
 
@@ -216,7 +230,7 @@ class EditorMenuBar:
         # ==========================================
         help_menu = menu_bar.addMenu("&Help")
 
-        act_palette = sm.register("help_palette", "Command Palette...", "App", "Ctrl+Shift+P", "Search and run any command", help_menu.addAction("Command Palette..."))
+        act_palette = sm.register("help_palette", "Command Palette...", "App", "Ctrl+K", "Search and run any command", help_menu.addAction("Command Palette..."))
         act_palette.action.triggered.connect(window.action_show_command_palette)
 
         act_keys = sm.register("help_shortcuts", "Keyboard Shortcuts...", "App", "F1", "View shortcuts cheat sheet", help_menu.addAction("Keyboard Shortcuts..."))

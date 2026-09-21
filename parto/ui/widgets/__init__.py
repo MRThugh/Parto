@@ -4,5 +4,6 @@
 from .toast import Toast
 from .welcome import WelcomeScreen
 from .crop_bar import CropBar
+from .brush_bar import BrushBar
 
-__all__ = ["Toast", "WelcomeScreen", "CropBar"]
+__all__ = ["Toast", "WelcomeScreen", "CropBar", "BrushBar"]

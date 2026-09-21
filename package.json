@@ -4,8 +4,9 @@
   "description": "Parto — Lightweight Desktop Image Editor",
   "private": true,
   "scripts": {
-    "build": "python3 -m py_compile main.py window.py editor.py image.py icons.py test_parto.py test_parto_v03.py",
-    "lint": "python3 -m py_compile main.py window.py editor.py image.py icons.py test_parto.py test_parto_v03.py",
+    "dev": "python3 -m http.server 3000 --bind 0.0.0.0",
+    "build": "python3 -m compileall -q .",
+    "lint": "python3 -m compileall -q .",
     "test": "QT_QPA_PLATFORM=offscreen pytest test_parto.py test_parto_v03.py"
   }
 }

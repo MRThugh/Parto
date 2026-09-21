@@ -288,3 +288,181 @@ def test_theme_manager_palettes():
         assert "text" in pal
         assert "primary" in pal
         assert "canvas_bg" in pal
+        assert "border_color" in pal
+
+
+def test_theme_semantic_colors():
+    tm = ThemeManager()
+    for semantic_name in ("primary", "bg", "text", "border_color", "accent", "danger"):
+        color = tm.get_semantic_color(semantic_name)
+        assert isinstance(color, str)
+        assert color.startswith("#") or color.startswith("rgba")
+
+
+def test_shortcut_manager_no_conflicts():
+    sm = ShortcutManager()
+    # Register core menu shortcuts
+    sm.register("file_new", "New Canvas...", "File", "Ctrl+N", "Create canvas")
+    sm.register("file_open", "Open Image...", "File", "Ctrl+O", "Open image")
+    sm.register("file_save", "Save", "File", "Ctrl+S", "Save image")
+    sm.register("file_save_as", "Save As...", "File", "Ctrl+Shift+S", "Save as")
+    sm.register("file_export", "Export As...", "File", "Ctrl+Shift+E", "Export image")
+    sm.register("edit_undo", "Undo", "Edit", "Ctrl+Z", "Undo")
+    sm.register("edit_redo", "Redo", "Edit", "Ctrl+Y", "Redo")
+    sm.register("edit_resize", "Resize Image...", "Edit", "Ctrl+Alt+I", "Resize image")
+    sm.register("tool_move", "Pan / Move Tool", "Tools", "V", "Pan canvas")
+    sm.register("tool_crop", "Crop Tool", "Tools", "C", "Crop canvas")
+    sm.register("tool_brush", "Brush Tool", "Tools", "B", "Brush tool")
+    sm.register("tool_eyedropper", "Eyedropper", "Tools", "I", "Sample color")
+    sm.register("view_layers", "Layers Panel", "View", "F7", "Toggle layers")
+    sm.register("view_adjustments", "Adjustments Panel", "View", "F8", "Toggle adjustments")
+    sm.register("img_rot_cw", "Rotate 90° Clockwise", "Image", "Ctrl+R", "Rotate CW")
+    sm.register("img_rot_ccw", "Rotate 90° Counter-Clockwise", "Image", "Ctrl+Shift+R", "Rotate CCW")
+    sm.register("img_rot_180", "Rotate 180°", "Image", "Ctrl+Alt+R", "Rotate 180")
+    sm.register("img_fliph", "Flip Horizontal", "Image", "Ctrl+H", "Flip horizontal")
+    sm.register("img_flipv", "Flip Vertical", "Image", "Ctrl+Shift+H", "Flip vertical")
+    sm.register("layer_mrg", "Merge Down", "Layers", "Ctrl+E", "Merge down")
+    sm.register("help_palette", "Command Palette...", "App", "Ctrl+K", "Command palette")
+    sm.register("edit_crop", "Crop Canvas...", "Edit", "Shift+C", "Crop canvas")
+    sm.register("img_remove_bg", "Remove Background", "Image", "Ctrl+Shift+B", "Remove background")
+
+    conflicts = sm.find_conflicts()
+    assert len(conflicts) == 0, f"Detected shortcut conflicts: {conflicts}"
+
+
+def test_brush_tool_properties_and_shortcuts():
+    brush = BrushTool()
+    # Initial defaults
+    assert brush.size == 8
+    assert brush.opacity == 1.0
+    assert brush.hardness == 0.8
+    assert brush.color == (0, 0, 0, 255)
+
+    # Size adjustment and clamping
+    brush.increase_size(4)
+    assert brush.size == 12
+    brush.decrease_size(2)
+    assert brush.size == 10
+
+    # Color swapping (X key)
+    brush.color = (255, 0, 0, 255)
+    brush.background_color = (0, 255, 0, 255)
+    brush.swap_colors()
+    assert brush.color == (0, 255, 0, 255)
+    assert brush.background_color == (255, 0, 0, 255)
+
+    # Reset to default black & white (D key)
+    brush.reset_default_colors()
+    assert brush.color == (0, 0, 0, 255)
+    assert brush.background_color == (255, 255, 255, 255)
+
+
+def test_vector_icon_canonical_aliases():
+    from parto.resources.icons import ICON_ALIASES
+    assert ICON_ALIASES.get("rotate_cw") == "rotate-cw"
+    assert ICON_ALIASES.get("rotate_ccw") == "rotate-ccw"
+    assert ICON_ALIASES.get("flip_h") == "flip-horizontal"
+    assert ICON_ALIASES.get("flip_v") == "flip-vertical"
+    assert ICON_ALIASES.get("zoom_in") == "zoom-in"
+    assert ICON_ALIASES.get("zoom_out") == "zoom-out"
+    assert ICON_ALIASES.get("zoom_fit") == "zoom-fit"
+
+
+def test_layer_opacity_history_coalescing(base_image):
+    doc = Document()
+    doc.new_document(300, 200)
+    assert doc.active_layer is not None
+
+    # Simulate slider drag: multiple continuous updates with record_history=False
+    start_snap = doc._create_snapshot()
+    doc.set_layer_opacity(0, 0.8, record_history=False)
+    doc.set_layer_opacity(0, 0.6, record_history=False)
+    doc.set_layer_opacity(0, 0.4, record_history=False)
+
+    # Opacity updated on layer without filling history stack
+    assert doc.active_layer.opacity == 0.4
+    assert doc.history.can_undo is False
+
+    # Slider released: commit single history entry
+    doc._record_operation("Change Layer Opacity", start_snap)
+    assert doc.history.can_undo is True
+
+    # Undo restores original 1.0 opacity
+    doc.history.undo()
+    assert doc.active_layer.opacity == 1.0
+
+
+def test_adjustment_factor_math():
+    # Slider values: -100 to +100 mapped to factors 0.0 to 2.0
+    def get_factors(b_val, c_val, s_val, sh_val):
+        b = max(0.0, 1.0 + (b_val / 100.0))
+        c = max(0.0, 1.0 + (c_val / 100.0))
+        s = max(0.0, 1.0 + (s_val / 100.0))
+        sh = max(0.0, 1.0 + (sh_val / 100.0))
+        return b, c, s, sh
+
+    # Neutral values
+    b, c, s, sh = get_factors(0, 0, 0, 0)
+    assert b == 1.0 and c == 1.0 and s == 1.0 and sh == 1.0
+
+    # Max increase
+    b, c, s, sh = get_factors(100, 50, -50, -100)
+    assert b == 2.0
+    assert c == 1.5
+    assert s == 0.5
+    assert sh == 0.0
+
+
+def test_brush_bar_and_icon_aliases():
+    from parto.ui.widgets.brush_bar import BrushBar
+    from parto.resources.icons import ICON_ALIASES
+
+    # Verify brush bar can be imported
+    assert BrushBar is not None
+
+    # Verify zoom icon aliases exist
+    assert "zoom_in" in ICON_ALIASES
+    assert "zoom_out" in ICON_ALIASES
+    assert "zoom_fit" in ICON_ALIASES
+
+
+def test_background_removal_api_consistency():
+    import inspect
+    from parto.editor.engine import EditorEngine
+    from parto.editor.document import Document
+    from parto.image.processing import remove_background
+    from parto.ui.main_window import MainWindow
+
+    # Check function signature in image processing
+    proc_sig = inspect.signature(remove_background)
+    assert "tolerance" in proc_sig.parameters
+    assert "feather_radius" in proc_sig.parameters
+
+    # Check EditorEngine methods
+    ee_rm = inspect.signature(EditorEngine.remove_background)
+    assert "tolerance" in ee_rm.parameters
+    assert "feather_radius" in ee_rm.parameters
+    ee_apply = inspect.signature(EditorEngine.apply_remove_background)
+    assert "tolerance" in ee_apply.parameters
+    assert "feather_radius" in ee_apply.parameters
+
+    # Check Document methods
+    doc_rm = inspect.signature(Document.remove_background)
+    assert "tolerance" in doc_rm.parameters
+    assert "feather_radius" in doc_rm.parameters
+    doc_apply = inspect.signature(Document.apply_remove_background)
+    assert "tolerance" in doc_apply.parameters
+    assert "feather_radius" in doc_apply.parameters
+
+    # Check MainWindow methods
+    mw_rm = inspect.signature(MainWindow.remove_background)
+    assert "tolerance" in mw_rm.parameters
+    assert "feather_radius" in mw_rm.parameters
+    mw_apply = inspect.signature(MainWindow.apply_remove_background)
+    assert "tolerance" in mw_apply.parameters
+    assert "feather_radius" in mw_apply.parameters
+
+    # Safe None handling
+    assert remove_background(None, tolerance=28, feather_radius=2) is None
+
+

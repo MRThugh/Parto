@@ -12,20 +12,38 @@
 
 ## Highlights of Version 0.3.0
 
-- **Modular Architecture**: Complete redesign separating state, UI presentation, command history, and tool logic into a maintainable `parto/` package.
-- **Multi-Layer System**: Non-destructive layer stack with opacity controls, visibility toggles, duplicate, reorder, and merge operations.
-- **Transactional Undo / Redo**: Command pattern (`parto.history`) tracking all modifications with configurable history depth and bounded memory.
-- **Interactive Tool Palette**:
-  - **Move Tool (`V`)**: Viewport panning and layer offset movement.
-  - **Crop Tool (`C`)**: 8-handle interactive bounding box with aspect ratio presets (Free, 1:1, 4:3, 16:9, 3:2).
-  - **Brush Tool (`B`)**: Freehand drawing directly onto the active layer with configurable color and radius.
-  - **Eyedropper (`I`)**: Real-time pixel color inspection with direct active color selection.
-- **Dynamic Theming System**:
+- **Authoritative Single-Document Architecture**: Unified state management through `Document` (`parto.editor.document`) and `LayerStack` (`parto.image.layers`). All image processing, layer compositing, transformations, filters, and color adjustments route through the central document model. `EditorEngine` operates as a seamless backward-compatibility shim.
+- **Multi-Layer System**:
+  - Non-destructive RGBA layer stack with per-layer opacity, vector eye visibility toggles, duplication, reordering, and merge down operations.
+  - Interactive Layers Panel (`F7`) with continuous opacity slider history coalescing (one undo step per drag gesture).
+  - Panels closed by default on startup for maximum canvas workspace.
+- **Live Non-Destructive Adjustments Panel (`F8`)**:
+  - Real-time color tuning: Brightness, Contrast, Saturation, and Sharpness.
+  - Live on-canvas non-destructive preview compositing.
+  - "Hold to Compare Original" instant before/after inspection.
+  - Atomic single-step undo history commit upon clicking Apply.
+- **Professional Interactive Brush Tool (`B`)**:
+  - Top context Brush Bar with size (1–200 px), opacity (1–100%), and hardness (0–100%) controls.
+  - Interactive foreground/background color swatches, color picker dialog, and curated palette chips.
+  - Anti-aliased smooth interpolated brush strokes directly onto the active document layer.
+  - Professional shortcuts: `[` / `]` for brush size, `X` to swap foreground/background colors, `D` to reset to default black/white.
+- **Normalized, Zero-Conflict Keyboard Shortcuts**:
+  - Fully audited and normalized keyboard shortcut registry managed via singleton `ShortcutManager`.
+  - Zero key collisions across all menus, tools, layers, and navigation actions.
+  - Interactive searchable shortcut reference cheat sheet dialog (`F1`).
+  - Searchable Command Palette (`Ctrl+K`).
+- **Dynamic Theming & 200ms Crossfade Transitions**:
   - 5 curated palettes: **Dark**, **Light**, **Graphite**, **Midnight**, and **Nord**.
-  - Adaptive contrast-aware vector icons.
-- **Asynchronous Worker Thread**: Non-blocking image processing pipeline (`parto.workers`) for heavy computations and file I/O.
-- **Centralized Keyboard Shortcut Registry**: Searchable keyboard shortcuts cheat sheet dialog (`Ctrl+/` or `F1`).
-- **Comprehensive Test Coverage**: 42 automated tests validating backward compatibility, layers, tools, history, and exports.
+  - Smooth 200ms crossfade animation (`transition_theme`) using `QGraphicsOpacityEffect` and `QPropertyAnimation`.
+  - Comprehensive semantic color lookups (`get_semantic_color`).
+- **High-DPI Vector Icon System**:
+  - Resolution-independent icons rendered via `QPainter` paths with canonical alias normalization.
+  - Automatic contrast-aware color adaptation based on active theme.
+- **Robust Exception Handling & Safe Export**:
+  - Full logging across file I/O, format conversion, and layer composition.
+  - Safe alpha-channel compositing when exporting transparent layers to formats without native transparency (e.g. JPEG white matte).
+- **Extended Test Suite**:
+  - Automated test coverage validating layers, command history, brush strokes, eyedropper, shortcut conflict detection, theme palettes, and export pipeline.
 
 ---
 
@@ -110,27 +128,62 @@ Parto/
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-| :--- | :--- |
-| `Ctrl+O` | Open Image |
-| `Ctrl+S` | Save Image |
-| `Ctrl+Shift+S` | Save As... |
-| `Ctrl+Z` | Undo |
-| `Ctrl+Y` | Redo |
-| `Ctrl+K` | Toggle Crop Tool |
-| `Ctrl+R` | Resize Dialog |
-| `Ctrl+Shift+L` | Rotate Left (90° CCW) |
-| `Ctrl+Shift+R` | Rotate Right (90° CW) |
-| `Ctrl++` | Zoom In |
-| `Ctrl+-` | Zoom Out |
-| `Ctrl+0` | Fit Image to Window |
-| `Ctrl+1` | Actual Size (100%) |
-| `Ctrl+I` | Image Properties |
-| `Ctrl+T` | Toggle Dark / Light Theme |
-| `Ctrl+Shift+P` | Open Command Palette |
-| `Ctrl+Q` | Exit Application |
-| `Enter` | Apply Crop (in crop mode) |
-| `Esc` | Cancel Crop / Close Dialogs |
+Parto v0.3.0 features a normalized, zero-conflict shortcut system registered through `ShortcutManager`:
+
+### File & App
+| Shortcut | Action | Description |
+| :--- | :--- | :--- |
+| `Ctrl+N` | New Canvas | Create a blank canvas with custom dimensions |
+| `Ctrl+O` | Open Image | Open image file from disk |
+| `Ctrl+S` | Save Image | Save active image in-place |
+| `Ctrl+Shift+S` | Save As... | Save copy with format selection |
+| `Ctrl+Shift+E` | Export As... | Fast export to WebP, JPEG, PNG, or TIFF |
+| `Ctrl+I` | Properties & Metadata | Inspect technical image specifications |
+| `Ctrl+K` | Command Palette | Search and launch any action instantly |
+| `F1` | Shortcut Reference | Searchable cheat sheet reference dialog |
+| `F11` | Fullscreen | Toggle fullscreen mode |
+| `Ctrl+Q` | Exit | Safely quit Parto (with unsaved changes prompt) |
+
+### Tools & Editing
+| Shortcut | Action | Description |
+| :--- | :--- | :--- |
+| `V` | Pan / Move Tool | Pan canvas viewport and drag content |
+| `C` | Crop Tool | Interactive 8-handle crop selection |
+| `B` | Brush Tool | Freehand painting on active layer |
+| `I` | Eyedropper Tool | Inspect and sample canvas pixel color |
+| `[` / `]` | Brush Size | Decrease / increase brush radius |
+| `X` | Swap Brush Colors | Swap active foreground and background colors |
+| `D` | Reset Brush Colors | Reset colors to standard default black & white |
+| `Enter` | Apply Crop | Execute crop with active bounding box |
+| `Esc` | Cancel / Dismiss | Cancel crop or close interactive dialogs |
+| `Ctrl+Z` | Undo | Revert last action or stroke |
+| `Ctrl+Y` | Redo | Reapply previously undone action |
+| `Ctrl+Alt+I` | Resize Image... | Resample canvas dimensions |
+
+### Layers & View
+| Shortcut | Action | Description |
+| :--- | :--- | :--- |
+| `F7` | Toggle Layers Panel | Show/hide multi-layer management dock |
+| `F8` | Toggle Adjustments | Show/hide real-time color adjustments dock |
+| `Ctrl+Shift+N` | New Layer | Create a new transparent layer |
+| `Ctrl+J` | Duplicate Layer | Duplicate active layer |
+| `Delete` | Delete Layer | Remove active layer from stack |
+| `Ctrl+Up` / `Ctrl+Down` | Reorder Layer | Move layer higher or lower in stack |
+| `Ctrl+E` | Merge Down | Merge active layer onto layer beneath |
+| `Ctrl+=` / `Ctrl++` | Zoom In | Increase canvas zoom factor |
+| `Ctrl+-` | Zoom Out | Decrease canvas zoom factor |
+| `Ctrl+0` | Fit on Screen | Fit entire canvas inside viewport |
+| `Ctrl+1` | 100% Actual Pixels | View image at 1:1 pixel scale |
+
+### Geometry & Transforms
+| Shortcut | Action | Description |
+| :--- | :--- | :--- |
+| `Ctrl+R` | Rotate 90° CW | Rotate canvas 90 degrees clockwise |
+| `Ctrl+Shift+R` | Rotate 90° CCW | Rotate canvas 90 degrees counter-clockwise |
+| `Ctrl+Alt+R` | Rotate 180° | Flip canvas upside down |
+| `Ctrl+H` | Flip Horizontal | Mirror canvas horizontally |
+| `Ctrl+Shift+H` | Flip Vertical | Mirror canvas vertically |
+| `Ctrl+Shift+F` | Filter Gallery | Open interactive filter gallery dialog |
 
 ---
 

@@ -51,7 +51,7 @@ class ShortcutManager:
         # Detect conflicts if key_sequence already in use
         if key_sequence:
             for existing_id, existing_defn in self._shortcuts.items():
-                if existing_id != action_id and existing_defn.key_sequence.lower() == key_sequence.lower():
+                if existing_id != action_id and existing_defn.key_sequence and existing_defn.key_sequence.lower() == key_sequence.lower():
                     import logging
                     logging.getLogger("parto.shortcuts").warning(
                         f"[Parto Shortcut Conflict] Shortcut '{key_sequence}' registered for '{action_id}' conflicts with '{existing_id}'"
@@ -67,13 +67,41 @@ class ShortcutManager:
         )
         self._shortcuts[action_id] = defn
 
-        if action is not None and key_sequence:
-            action.setShortcut(QKeySequence(key_sequence))
-            # Format tooltip with shortcut
-            base_tip = description or name
-            action.setToolTip(f"{base_tip} ({key_sequence})")
+        if action is not None:
+            if key_sequence:
+                from PySide6.QtCore import Qt
+                action.setShortcut(QKeySequence(key_sequence))
+                action.setShortcutContext(Qt.WindowShortcut)
+                # Format tooltip with shortcut
+                base_tip = description or name
+                action.setToolTip(f"{base_tip} ({key_sequence})")
+            else:
+                action.setShortcut(QKeySequence())
+                base_tip = description or name
+                action.setToolTip(base_tip)
 
         return defn
+
+    def remap_shortcut(self, action_id: str, new_key_sequence: str) -> bool:
+        """
+        Dynamically update key sequence for a registered action, synchronizing with QAction.
+        """
+        defn = self._shortcuts.get(action_id)
+        if not defn:
+            return False
+        defn.key_sequence = new_key_sequence
+        if defn.action is not None:
+            if new_key_sequence:
+                from PySide6.QtCore import Qt
+                defn.action.setShortcut(QKeySequence(new_key_sequence))
+                defn.action.setShortcutContext(Qt.WindowShortcut)
+                base_tip = defn.description or defn.name
+                defn.action.setToolTip(f"{base_tip} ({new_key_sequence})")
+            else:
+                defn.action.setShortcut(QKeySequence())
+                defn.action.setToolTip(defn.description or defn.name)
+        return True
+
 
     def find_conflicts(self) -> Dict[str, List[str]]:
         """Return any duplicated keyboard shortcuts."""

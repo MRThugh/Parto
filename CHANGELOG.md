@@ -10,34 +10,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.0] - 2026-09-21
 
 ### Added
-- **Complete Modular Architecture (`parto/`)**:
-  - Replaced monolithic `window.py` with modular subsystem packages: `editor`, `image`, `history`, `shortcuts`, `tools`, `ui`, `utils`, `resources`, `workers`, and `themes`.
-  - Maintained 100% backward compatibility via root re-export shims (`window.py`, `editor.py`, `image.py`, `icons.py`).
-- **Multi-Layer Engine (`parto.image.layers`)**:
+- **Authoritative Single-Document Architecture**:
+  - Reconciled document state management into `Document` and `LayerStack` as the authoritative single source of truth.
+  - Retired `EditorEngine` as an independent state manager; retained it as an API compatibility shim forwarding directly to `Document`.
+  - Maintained 100% backward compatibility with existing tests and scripts (`window.py`, `editor.py`, `image.py`, `icons.py`).
+- **Multi-Layer Engine & Panel (`parto.image.layers`)**:
   - Full layer stack architecture with non-destructive composition, per-layer opacity, visibility toggle, and layer ordering.
-  - Interactive Layers Panel with live thumbnail generation, add, duplicate, delete, reorder, and merge down operations.
-- **Command Pattern & Managed History (`parto.history`)**:
-  - Robust Command pattern (`Command`, `SnapshotCommand`, `AddLayerCommand`, `RemoveLayerCommand`, `ApplyAdjustmentCommand`, `ApplyFilterCommand`).
-  - Configurable history limit with bounded memory management and transactional undo/redo.
-- **Pluggable Interactive Canvas Tools (`parto.tools`)**:
-  - `MoveTool`: Freeform viewport panning and layer content repositioning.
-  - `CropTool`: 8-handle drag-to-resize selection with aspect-ratio constraints (Free, 1:1, 4:3, 16:9, 3:2) and boundary clamping.
-  - `BrushTool`: Freehand drawing directly onto active layer with configurable color and radius.
-  - `EyedropperTool`: Live pixel color sampling from composite canvas with RGB/RGBA coordinate inspection.
-- **Non-Blocking Background Worker (`parto.workers`)**:
-  - `ImageWorkerThread` with cancelable tasks and Qt signals for heavy operations (large file loading, blur/sharpen, format export).
-- **Centralized Shortcut Manager (`parto.shortcuts`)**:
-  - Comprehensive action registry with category grouping, conflict avoidance, and interactive Keyboard Shortcuts cheat sheet dialog (`Ctrl+/` or `F1`).
-- **Modern Theme System (`parto.themes`)**:
-  - Dynamic QSS stylesheet generation for 5 curated palettes: **Dark**, **Light**, **Graphite**, **Midnight**, and **Nord**.
-  - Dynamic vector icon recoloring based on active theme contrast metrics.
-- **Advanced Export Pipeline (`parto.image.export`)**:
-  - Comprehensive format support: PNG, JPEG (with white matte RGBA compositing), WebP (lossy & lossless), BMP, and TIFF.
+  - Interactive Layers Panel (`F7`) with live thumbnail generation, add, duplicate, delete, reorder, and merge down operations.
+  - History coalescing on opacity slider dragging: continuous interactions record a single discrete undo step upon release.
+  - Both side dock panels (`Layers` and `Adjustments`) are now cleanly hidden by default on startup for maximum workspace.
+- **Professional Interactive Brush Tool (`B`)**:
+  - Top context `BrushBar` equipped with Size (1–200 px), Opacity (1–100%), and Hardness (0–100%) sliders and spinboxes.
+  - Interactive foreground and background color chips, quick-swatch palette, and standard color dialog picker.
+  - Smooth anti-aliased interpolation drawing directly onto the active document layer.
+  - Shortcut controls: `[` / `]` for brush size, `X` to swap foreground/background, `D` to reset to default black/white.
+- **Live Non-Destructive Adjustments Panel (`F8`)**:
+  - Real-time adjustment of Brightness, Contrast, Saturation, and Sharpness with live canvas previewing.
+  - "Hold to Compare Original" instant before/after preview inspection button.
+  - History coalescing: slider adjustments preview non-destructively; applying commits an atomic single-step undo history item.
+- **Normalized, Zero-Conflict Shortcut Architecture**:
+  - Systematic audit and re-mapping of all menu and tool shortcuts through `ShortcutManager`.
+  - Complete elimination of keyboard shortcut collisions across all menus, tools, and actions.
+  - Dynamic Command Palette (`Ctrl+K`) querying registered actions directly from `ShortcutManager`.
+  - Comprehensive Keyboard Shortcuts cheat sheet reference dialog (`F1`).
+- **Smooth 200ms Theme Crossfade Transitions**:
+  - Added `transition_theme` in `ThemeManager` with `QGraphicsOpacityEffect` and `QPropertyAnimation` over viewport captures.
+  - 5 curated palettes: **Dark**, **Light**, **Graphite**, **Midnight**, and **Nord** with unified semantic color lookup (`get_semantic_color`).
+- **High-DPI Vector Icon System (`parto.resources.icons`)**:
+  - Geometric vector icons drawn with `QPainter` paths, supporting canonical hyphenated alias resolution and automatic contrast-aware theme recoloring.
+- **Safe Export Pipeline & Error Logging**:
+  - Full logging across file I/O, format conversion, and layer operations, eliminating silent `pass` blocks.
+  - Safe alpha-channel compositing when exporting transparent layers to JPEG or non-alpha formats.
 - **Extended Test Suite (`test_parto_v03.py`)**:
-  - 12 comprehensive unit and integration tests covering layer stacking, command history, brush strokes, eyedropper, shortcuts, and palettes (totaling 42 passed tests).
+  - Automated tests validating layers, command history, brush strokes, eyedropper, shortcut conflict detection, theme palettes, and export pipeline.
 
 ### Changed
-- **Entry Point**: Modernized `main.py` to initialize `ThemeManager`, set application metadata, and load the new `MainWindow`.
+- **Entry Point**: Modernized `main.py` to initialize `ThemeManager`, configure High-DPI scaling, set application metadata, and load `MainWindow`.
+- **Docks**: Hidden by default on startup for a distraction-free, clean canvas experience.
 - **Status Bar & Tool Bar**: Split into dedicated modular components with responsive breadcrumbs, zoom slider, color swatch, and status notifications.
 
 ---

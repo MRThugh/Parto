@@ -18,20 +18,30 @@ from PySide6.QtGui import (
 logger = logging.getLogger("parto.icons")
 
 _ICON_CACHE: Dict[Tuple[str, str, int], QIcon] = {}
+_WARNED_MISSING_ICONS: set = set()
 
 # Canonical name aliases
 ICON_ALIASES: Dict[str, str] = {
-    # Actions
-    "rot_cw": "rotate-right",
-    "rotate_cw": "rotate-right",
-    "rotate-cw": "rotate-right",
-    "rot_ccw": "rotate-left",
-    "rotate_ccw": "rotate-left",
-    "rotate-ccw": "rotate-left",
+    # Navigation / View
+    "zoom_in": "zoom-in",
+    "zoom_out": "zoom-out",
+    "zoom_fit": "zoom-fit",
+    "fit": "zoom-fit",
+    "zoom_actual": "zoom-actual",
+    "actual": "zoom-actual",
+    # Transformations
+    "rot_cw": "rotate-cw",
+    "rotate_cw": "rotate-cw",
+    "rotate-right": "rotate-cw",
+    "rot_ccw": "rotate-ccw",
+    "rotate_ccw": "rotate-ccw",
+    "rotate-left": "rotate-ccw",
     "flip-h": "flip-horizontal",
     "flip_h": "flip-horizontal",
     "flip-v": "flip-vertical",
     "flip_v": "flip-vertical",
+    # Document
+    "save_as": "save-as",
     # Layers
     "add_layer": "layer-add",
     "new_layer": "layer-add",
@@ -62,7 +72,11 @@ def get_parto_icon(name: str, color_hex: str = "#e0e0e0", size: int = 24) -> QIc
     Generate or retrieve cached crisp, resolution-independent vector icons.
     Supports canonical names, registered aliases, and fallback rendering.
     """
-    canonical_name = ICON_ALIASES.get(name.lower(), name.lower())
+    raw_name = name.lower().strip()
+    aliased = ICON_ALIASES.get(raw_name, raw_name)
+    canonical_name = aliased.replace("_", "-")
+    canonical_name = ICON_ALIASES.get(canonical_name, canonical_name)
+
     cache_key = (canonical_name, color_hex, size)
     if cache_key in _ICON_CACHE:
         return _ICON_CACHE[cache_key]
@@ -194,7 +208,7 @@ def get_parto_icon(name: str, color_hex: str = "#e0e0e0", size: int = 24) -> QIc
         painter.drawLine(QPointF(x1 - s * 0.14, y1), QPointF(x1, y1))
         painter.drawLine(QPointF(x1, y1 + s * 0.14), QPointF(x1, y1))
 
-    elif canonical_name == "rotate-left":
+    elif canonical_name in ("rotate-ccw", "rotate_ccw", "rot-ccw", "rot_ccw", "rotate-left"):
         rect = QRectF(pad + s * 0.05, pad + s * 0.05, s - 2 * pad - s * 0.1, s - 2 * pad - s * 0.1)
         painter.drawArc(rect, 45 * 16, 270 * 16)
         ax, ay = pad + s * 0.18, pad + s * 0.35
@@ -204,7 +218,7 @@ def get_parto_icon(name: str, color_hex: str = "#e0e0e0", size: int = 24) -> QIc
         ah.lineTo(ax + s * 0.12, ay)
         painter.drawPath(ah)
 
-    elif canonical_name == "rotate-right":
+    elif canonical_name in ("rotate-cw", "rotate_cw", "rot-cw", "rot_cw", "rotate-right"):
         rect = QRectF(pad + s * 0.05, pad + s * 0.05, s - 2 * pad - s * 0.1, s - 2 * pad - s * 0.1)
         painter.drawArc(rect, 45 * 16, -270 * 16)
         ax, ay = s - pad - s * 0.18, pad + s * 0.35
@@ -214,7 +228,7 @@ def get_parto_icon(name: str, color_hex: str = "#e0e0e0", size: int = 24) -> QIc
         ah.lineTo(ax - s * 0.12, ay)
         painter.drawPath(ah)
 
-    elif canonical_name == "rotate-180":
+    elif canonical_name in ("rotate-180", "rotate_180", "rot-180", "rot_180"):
         rect = QRectF(pad + s * 0.05, pad + s * 0.05, s - 2 * pad - s * 0.1, s - 2 * pad - s * 0.1)
         painter.drawArc(rect, 0, -180 * 16)
         ax, ay = s * 0.5, s - pad - s * 0.05
@@ -224,7 +238,7 @@ def get_parto_icon(name: str, color_hex: str = "#e0e0e0", size: int = 24) -> QIc
         ah.lineTo(ax + s * 0.1, ay + s * 0.12)
         painter.drawPath(ah)
 
-    elif canonical_name in ("flip-horizontal", "flip-h"):
+    elif canonical_name in ("flip-horizontal", "flip_horizontal", "flip-h", "flip_h"):
         cx = s * 0.5
         pen.setStyle(Qt.DashLine)
         painter.setPen(pen)
@@ -244,7 +258,7 @@ def get_parto_icon(name: str, color_hex: str = "#e0e0e0", size: int = 24) -> QIc
         t2.closeSubpath()
         painter.drawPath(t2)
 
-    elif canonical_name in ("flip-vertical", "flip-v"):
+    elif canonical_name in ("flip-vertical", "flip_vertical", "flip-v", "flip_v"):
         cy = s * 0.5
         pen.setStyle(Qt.DashLine)
         painter.setPen(pen)
@@ -288,7 +302,7 @@ def get_parto_icon(name: str, color_hex: str = "#e0e0e0", size: int = 24) -> QIc
         painter.drawLine(QPointF(pad, pad + s * 0.55), QPointF(s * 0.5, pad + s * 0.05))
 
     # 5. Zoom & View Controls
-    elif canonical_name == "zoom-in":
+    elif canonical_name in ("zoom-in", "zoom_in"):
         r = s * 0.26
         cx, cy = pad + r + s * 0.04, pad + r + s * 0.04
         painter.drawEllipse(QPointF(cx, cy), r, r)
@@ -297,7 +311,7 @@ def get_parto_icon(name: str, color_hex: str = "#e0e0e0", size: int = 24) -> QIc
         painter.drawLine(QPointF(cx - r * 0.5, cy), QPointF(cx + r * 0.5, cy))
         painter.drawLine(QPointF(cx, cy - r * 0.5), QPointF(cx, cy + r * 0.5))
 
-    elif canonical_name == "zoom-out":
+    elif canonical_name in ("zoom-out", "zoom_out"):
         r = s * 0.26
         cx, cy = pad + r + s * 0.04, pad + r + s * 0.04
         painter.drawEllipse(QPointF(cx, cy), r, r)
@@ -305,7 +319,7 @@ def get_parto_icon(name: str, color_hex: str = "#e0e0e0", size: int = 24) -> QIc
         painter.drawLine(QPointF(hx, hy), QPointF(s - pad, s - pad))
         painter.drawLine(QPointF(cx - r * 0.5, cy), QPointF(cx + r * 0.5, cy))
 
-    elif canonical_name == "zoom-fit":
+    elif canonical_name in ("zoom-fit", "zoom_fit", "fit"):
         d = s * 0.22
         painter.drawLine(QPointF(pad, pad + d), QPointF(pad, pad))
         painter.drawLine(QPointF(pad, pad), QPointF(pad + d, pad))
@@ -316,10 +330,10 @@ def get_parto_icon(name: str, color_hex: str = "#e0e0e0", size: int = 24) -> QIc
         painter.drawLine(QPointF(s - pad - d, s - pad), QPointF(s - pad, s - pad))
         painter.drawLine(QPointF(s - pad, s - pad), QPointF(s - pad, s - pad - d))
 
-    elif canonical_name == "zoom-actual":
+    elif canonical_name in ("zoom-actual", "zoom_actual", "actual"):
         painter.drawRoundedRect(QRectF(pad, pad, s - 2 * pad, s - 2 * pad), 2, 2)
-        font = painter.font()
-        font.setPixelSize(max(8, int(s * 0.30)))
+        font = QFont()
+        font.setPointSize(max(7, int(s * 0.26)))
         font.setBold(True)
         painter.setFont(font)
         painter.setPen(pen)
@@ -482,7 +496,9 @@ def get_parto_icon(name: str, color_hex: str = "#e0e0e0", size: int = 24) -> QIc
 
     else:
         # Fallback icon for missing/unrecognized icon names
-        logger.warning(f"[Parto Icon Warning] Missing icon '{name}' (canonical: '{canonical_name}')")
+        if canonical_name not in _WARNED_MISSING_ICONS:
+            _WARNED_MISSING_ICONS.add(canonical_name)
+            logger.warning(f"[Parto Icon Warning] Missing icon '{name}' (canonical: '{canonical_name}')")
         box = QRectF(pad, pad, s - 2 * pad, s - 2 * pad)
         pen.setStyle(Qt.DashLine)
         painter.setPen(pen)

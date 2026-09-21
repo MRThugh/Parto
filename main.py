@@ -38,6 +38,12 @@ def main():
     app.setApplicationVersion("0.3.0")
     app.setOrganizationName("Parto")
 
+    # Ensure application font has a valid point size
+    app_font = app.font()
+    if app_font.pointSize() <= 0:
+        app_font.setPointSize(10)
+        app.setFont(app_font)
+
     # Initialize theme subsystem
     get_theme_manager().apply_to_application()
 

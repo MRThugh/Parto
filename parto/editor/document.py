@@ -19,7 +19,7 @@ from ..image.transforms import (
     resize_image,
     crop_image,
 )
-from ..image.processing import apply_color_adjustments
+from ..image.processing import apply_color_adjustments, remove_background
 from ..image.filters import apply_filter
 from ..image.export import save_image_file
 from ..history.manager import HistoryManager
@@ -306,11 +306,14 @@ class Document(QObject):
             self._record_operation("Toggle Layer Visibility", snap)
             self.invalidate_composite()
 
-    def set_layer_opacity(self, index: int, opacity: float) -> None:
+    def set_layer_opacity(self, index: int, opacity: float, record_history: bool = True) -> None:
         if 0 <= index < len(self._layers):
-            snap = self._create_snapshot()
-            self._layers[index].set_opacity(opacity)
-            self._record_operation("Change Layer Opacity", snap)
+            if record_history:
+                snap = self._create_snapshot()
+                self._layers[index].set_opacity(opacity)
+                self._record_operation("Change Layer Opacity", snap)
+            else:
+                self._layers[index].set_opacity(opacity)
             self.invalidate_composite()
 
     # Transformations (Operate on active layer or entire document)
@@ -447,3 +450,26 @@ class Document(QObject):
         active.image = apply_filter(active.image, filter_name)
         self._record_operation(f"Filter ({filter_name.title()})", snap)
         self.invalidate_composite()
+
+    def remove_background(self, tolerance: int = 28, feather_radius: int = 2) -> None:
+        """
+        Remove background from the active layer with tolerance and edge feathering.
+        Records history for undo/redo.
+        """
+        active = self.active_layer
+        if active is None or not self.has_image:
+            return
+        snap = self._create_snapshot()
+        active.image = remove_background(
+            active.image,
+            tolerance=tolerance,
+            feather_radius=feather_radius,
+        )
+        self._record_operation("Remove Background", snap)
+        self.invalidate_composite()
+        self.set_modified(True)
+
+    def apply_remove_background(self, tolerance: int = 28, feather_radius: int = 2) -> None:
+        """Consistent alias for remove_background."""
+        self.remove_background(tolerance=tolerance, feather_radius=feather_radius)
+

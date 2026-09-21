@@ -36,6 +36,7 @@ from ..workers.image_worker import AsyncOperationRunner
 
 from .widgets.welcome import WelcomeScreen
 from .widgets.crop_bar import CropBar
+from .widgets.brush_bar import BrushBar
 from .widgets.toast import Toast
 from .panels.adjustments import AdjustmentDock
 from .panels.layers_panel import LayersDock
@@ -114,6 +115,15 @@ class MainWindow(QMainWindow):
         self.crop_bar.cancel_clicked.connect(self.cancel_crop)
         self.central_layout.addWidget(self.crop_bar)
 
+        # Brush Bar (Hidden by default until Brush tool is active)
+        self.brush_bar = BrushBar(self)
+        self.brush_bar.hide()
+        self.brush_bar.size_changed.connect(lambda s: setattr(self.tool_brush, "size", s))
+        self.brush_bar.opacity_changed.connect(lambda o: setattr(self.tool_brush, "opacity", o))
+        self.brush_bar.hardness_changed.connect(lambda h: setattr(self.tool_brush, "hardness", h))
+        self.brush_bar.color_changed.connect(self.set_brush_color)
+        self.central_layout.addWidget(self.brush_bar)
+
         # Stack: 0 -> Welcome Screen, 1 -> Canvas
         self.stack = QStackedWidget(self)
 
@@ -143,7 +153,8 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.RightDockWidgetArea, self.adjustments_dock)
 
         self.tabifyDockWidget(self.layers_dock, self.adjustments_dock)
-        self.layers_dock.raise_()
+        self.layers_dock.hide()
+        self.adjustments_dock.hide()
 
     def _init_toolbar(self):
         """Construct the top tool bar."""
@@ -172,7 +183,7 @@ class MainWindow(QMainWindow):
         self.toolbar.addSeparator()
 
         # Tools group
-        self.tb_tool_move = self.toolbar.register_action("move", "Pan / Hand Tool (H)", "move", checkable=True, is_tool=True)
+        self.tb_tool_move = self.toolbar.register_action("move", "Pan / Move Tool (V)", "move", checkable=True, is_tool=True)
         self.tb_tool_move.setChecked(True)
         self.tb_tool_move.triggered.connect(self.action_tool_move)
 
@@ -188,10 +199,10 @@ class MainWindow(QMainWindow):
         self.toolbar.addSeparator()
 
         # Quick transforms
-        act_rcw = self.toolbar.register_action("rot_cw", "Rotate Right", "rotate_cw")
+        act_rcw = self.toolbar.register_action("rot_cw", "Rotate Right", "rotate-cw")
         act_rcw.triggered.connect(lambda: self.document.rotate_document(True))
 
-        act_fliph = self.toolbar.register_action("flip_h", "Flip Horizontal", "flip_h")
+        act_fliph = self.toolbar.register_action("flip_h", "Flip Horizontal", "flip-horizontal")
         act_fliph.triggered.connect(self.document.flip_horizontal_document)
 
         act_resize = self.toolbar.register_action("resize", "Resize Image", "resize")
@@ -200,13 +211,13 @@ class MainWindow(QMainWindow):
         self.toolbar.addSeparator()
 
         # Zoom buttons
-        act_zin = self.toolbar.register_action("zoom_in", "Zoom In", "zoom_in")
+        act_zin = self.toolbar.register_action("zoom_in", "Zoom In", "zoom-in")
         act_zin.triggered.connect(self.canvas.zoom_in)
 
-        act_zout = self.toolbar.register_action("zoom_out", "Zoom Out", "zoom_out")
+        act_zout = self.toolbar.register_action("zoom_out", "Zoom Out", "zoom-out")
         act_zout.triggered.connect(self.canvas.zoom_out)
 
-        act_zfit = self.toolbar.register_action("zoom_fit", "Fit Window", "zoom_fit")
+        act_zfit = self.toolbar.register_action("zoom_fit", "Fit Window", "zoom-fit")
         act_zfit.triggered.connect(self.canvas.zoom_fit)
 
     def _init_statusbar(self):
@@ -384,12 +395,14 @@ class MainWindow(QMainWindow):
     # Tool Switching
     def action_tool_move(self):
         self.crop_bar.hide()
+        self.brush_bar.hide()
         self.canvas.set_tool(self.tool_move)
         self.tb_tool_move.setChecked(True)
 
     def action_tool_crop(self):
         if not self.document.has_image:
             return
+        self.brush_bar.hide()
         self.crop_bar.show()
         self.crop_bar.set_dimension_text(f"{self.document.width} × {self.document.height} px")
         self.canvas.set_tool(self.tool_crop)
@@ -411,18 +424,23 @@ class MainWindow(QMainWindow):
 
     def action_tool_brush(self):
         self.crop_bar.hide()
+        self.brush_bar.show()
+        self.brush_bar.set_color(self.tool_brush.color)
         self.canvas.set_tool(self.tool_brush)
         self.tb_tool_brush.setChecked(True)
-        self.toast.show_message("Brush Tool active")
+        self.toast.show_message("Brush Tool active — [ / ] resize, X swap, D reset")
 
     def action_tool_eyedropper(self):
         self.crop_bar.hide()
+        self.brush_bar.hide()
         self.canvas.set_tool(self.tool_eyedropper)
         self.tb_tool_eyedropper.setChecked(True)
         self.toast.show_message("Eyedropper active — Click pixel to sample color")
 
     def set_brush_color(self, rgba: Tuple[int, int, int, int]):
         self.tool_brush.color = rgba
+        if hasattr(self, "brush_bar"):
+            self.brush_bar.set_color(rgba)
         r, g, b, _ = rgba
         self.toast.show_message(f"Sampled #{r:02X}{g:02X}{b:02X}")
 
@@ -432,8 +450,32 @@ class MainWindow(QMainWindow):
         self.toast.show_message("Color adjustments applied to active layer")
 
     def _on_preview_adjustments(self, b: float, c: float, s: float, sh: float):
-        # Temporary live view can be displayed on canvas if desired
-        pass
+        if not self.document.has_image or not self.document.active_layer:
+            return
+        from ..image.processing import (
+            adjust_brightness,
+            adjust_contrast,
+            adjust_saturation,
+            adjust_sharpness,
+        )
+        img = self.document.active_layer.image.copy()
+        if abs(b - 1.0) > 0.001:
+            img = adjust_brightness(img, b)
+        if abs(c - 1.0) > 0.001:
+            img = adjust_contrast(img, c)
+        if abs(s - 1.0) > 0.001:
+            img = adjust_saturation(img, s)
+        if abs(sh - 1.0) > 0.001:
+            img = adjust_sharpness(img, sh)
+
+        if len(self.document.layers) <= 1:
+            self.canvas.show_preview_image(img)
+        else:
+            orig = self.document.active_layer.image
+            self.document.active_layer.image = img
+            comp = self.document.get_composite()
+            self.document.active_layer.image = orig
+            self.canvas.show_preview_image(comp)
 
     def _on_reset_preview_adjustments(self):
         self.canvas.update_composite_pixmap()
@@ -451,33 +493,11 @@ class MainWindow(QMainWindow):
 
     # Command Palette & Cheat Sheet
     def action_show_command_palette(self):
-        commands: List[Tuple[str, str, str, Callable[[], None]]] = [
-            ("file_new", "New Canvas...", "Ctrl+N", self.action_new_canvas),
-            ("file_open", "Open Image...", "Ctrl+O", self.action_open_image),
-            ("file_save", "Save", "Ctrl+S", self.action_save_image),
-            ("file_save_as", "Save As...", "Ctrl+Shift+S", self.action_save_as),
-            ("file_info", "Properties & Metadata...", "Ctrl+I", self.action_show_info),
-            ("edit_undo", "Undo", "Ctrl+Z", self.action_undo),
-            ("edit_redo", "Redo", "Ctrl+Y", self.action_redo),
-            ("edit_crop", "Crop Tool", "C", self.action_tool_crop),
-            ("edit_resize", "Resize Image...", "Ctrl+R", self.action_resize_image),
-            ("tool_move", "Pan / Hand Tool", "H", self.action_tool_move),
-            ("tool_brush", "Brush Tool", "B", self.action_tool_brush),
-            ("tool_eyedropper", "Eyedropper", "I", self.action_tool_eyedropper),
-            ("view_zin", "Zoom In", "Ctrl+=", self.canvas.zoom_in),
-            ("view_zout", "Zoom Out", "Ctrl+-", self.canvas.zoom_out),
-            ("view_zfit", "Fit on Screen", "Ctrl+0", self.canvas.zoom_fit),
-            ("view_z100", "Actual Pixels (100%)", "Ctrl+1", self.canvas.zoom_actual),
-            ("view_fullscreen", "Toggle Fullscreen", "F11", self.action_toggle_fullscreen),
-            ("img_rcw", "Rotate 90° Clockwise", "Ctrl+]", lambda: self.document.rotate_document(True)),
-            ("img_rccw", "Rotate 90° Counter-Clockwise", "Ctrl+[", lambda: self.document.rotate_document(False)),
-            ("img_r180", "Rotate 180°", "Ctrl+Shift+R", self.document.rotate_180_document),
-            ("img_fliph", "Flip Horizontal", "Ctrl+H", self.document.flip_horizontal_document),
-            ("img_flipv", "Flip Vertical", "Ctrl+J", self.document.flip_vertical_document),
-            ("filter_gallery", "Filter Gallery...", "Ctrl+Shift+F", self.action_show_filter_gallery),
-            ("help_shortcuts", "Keyboard Shortcuts...", "F1", self.action_show_shortcuts),
-            ("help_about", "About Parto", "", self.action_show_about),
-        ]
+        sm = get_shortcut_manager()
+        commands: List[Tuple[str, str, str, Callable[[], None]]] = []
+        for defn in sm.get_all():
+            if defn.action is not None:
+                commands.append((defn.action_id, defn.name, defn.key_sequence, defn.action.trigger))
 
         dlg = CommandPalette(commands, self)
         dlg.exec()
@@ -495,6 +515,32 @@ class MainWindow(QMainWindow):
             self.showNormal()
         else:
             self.showFullScreen()
+
+    def apply_remove_background(self, tolerance: int = 28, feather_radius: int = 2):
+        """
+        Remove background from active image using tolerance and edge feathering.
+        Applies to document and updates canvas/status.
+        """
+        if hasattr(self, "document") and self.document.has_image:
+            self.document.remove_background(tolerance=tolerance, feather_radius=feather_radius)
+            if hasattr(self, "engine"):
+                try:
+                    self.engine.remove_background(tolerance=tolerance, feather_radius=feather_radius)
+                except Exception:
+                    pass
+            self.canvas.update()
+            self.statusbar.set_status("Removed background")
+            self.toast.show_message("Background removed")
+        elif hasattr(self, "engine") and getattr(self.engine, "current_image", None):
+            self.engine.remove_background(tolerance=tolerance, feather_radius=feather_radius)
+            self.canvas.update()
+            self.statusbar.set_status("Removed background")
+            self.toast.show_message("Background removed")
+
+    def remove_background(self, tolerance: int = 28, feather_radius: int = 2):
+        """Alias for apply_remove_background."""
+        self.apply_remove_background(tolerance=tolerance, feather_radius=feather_radius)
+
 
     # Drag & Drop Support
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:

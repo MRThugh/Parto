@@ -18,7 +18,7 @@ from ..image.transforms import (
     resize_image,
     crop_image,
 )
-from ..image.processing import apply_color_adjustments
+from ..image.processing import apply_color_adjustments, remove_background
 from ..image.filters import apply_filter
 from ..image.export import save_image_file
 
@@ -208,3 +208,22 @@ class EditorEngine:
             if res is not None:
                 self._push_undo()
                 self._current_image = res
+
+    # Background Removal
+    def remove_background(self, tolerance: int = 28, feather_radius: int = 2):
+        """
+        Remove background from the active image with tolerance and edge feathering.
+        Records history for undo/redo.
+        """
+        if self._current_image:
+            self._push_undo()
+            self._current_image = remove_background(
+                self._current_image,
+                tolerance=tolerance,
+                feather_radius=feather_radius,
+            )
+
+    def apply_remove_background(self, tolerance: int = 28, feather_radius: int = 2):
+        """Consistent alias for remove_background."""
+        self.remove_background(tolerance=tolerance, feather_radius=feather_radius)
+
