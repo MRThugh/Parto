@@ -2,15 +2,17 @@
 """
 Parto - A fast, modern, and lightweight desktop image editor.
 Author: Ali Kamrani (MRThugh)
-Version: 0.2.0
+Version: 0.3.0
 """
 
 import sys
 import os
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon
-from window import MainWindow
-from icons import get_parto_icon
+
+from parto.ui.main_window import MainWindow
+from parto.resources.icons import get_parto_icon
+from parto.themes.manager import get_theme_manager
 
 
 def resource_path(relative_path: str) -> str:
@@ -33,8 +35,11 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Parto")
     app.setApplicationDisplayName("Parto — پرتو")
-    app.setApplicationVersion("0.2.0")
+    app.setApplicationVersion("0.3.0")
     app.setOrganizationName("Parto")
+
+    # Initialize theme subsystem
+    get_theme_manager().apply_to_application()
 
     # Set crisp application vector icon
     logo_path = resource_path("logo.png")

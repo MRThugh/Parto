@@ -1,15 +1,14 @@
 # image.py
 """
-Parto - Image Conversion & Metadata Utilities
+Parto v0.3.0 - Image Conversion & Metadata Compatibility Layer
 Author: Ali Kamrani (MRThugh)
-Version: 0.2.0
 """
 
 import os
 from PIL import Image
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtGui import QPixmap
+from parto.utils.conversions import pil_to_qpixmap
 
-# Optional HEIF format support for Apple device images
 try:
     import pillow_heif
     pillow_heif.register_heif_opener()
@@ -19,8 +18,7 @@ except ImportError:
 
 def get_image_info(filepath: str | None = None, pil_img: Image.Image | None = None) -> dict:
     """
-    Extract verified, accurate information about the image file and in-memory object.
-    Does not invent fake or estimated data.
+    Extract verified, accurate technical information about the image file and in-memory object.
     """
     info = {
         "filename": "Untitled",
@@ -47,7 +45,6 @@ def get_image_info(filepath: str | None = None, pil_img: Image.Image | None = No
         else:
             info["size_str"] = f"{size_bytes / 1024:.1f} KB"
 
-    # If PIL Image instance provided, extract properties directly
     img = pil_img
     opened_here = False
     if img is None and filepath and os.path.exists(filepath):
@@ -70,10 +67,8 @@ def get_image_info(filepath: str | None = None, pil_img: Image.Image | None = No
         )
         info["has_transparency"] = has_alpha
 
-        # Calculate exact aspect ratio
         if h > 0:
             ratio = w / h
-            # Match common standard aspect ratios
             common_ratios = [
                 (1.0, "1:1"),
                 (4 / 3, "4:3"),
@@ -100,34 +95,4 @@ def get_image_info(filepath: str | None = None, pil_img: Image.Image | None = No
     return info
 
 
-def pil_to_qpixmap(pil_img: Image.Image | None) -> QPixmap:
-    """
-    Convert a PIL Image to PySide6 QPixmap safely using copy()
-    to prevent memory collection issues during rapid zoom/transformations.
-    Preserves alpha channels and handles diverse PIL modes (RGBA, LA, P, L, RGB, CMYK).
-    """
-    if pil_img is None:
-        return QPixmap()
-
-    try:
-        mode = pil_img.mode
-
-        # Check for transparency in Palette or Alpha modes
-        if mode in ("RGBA", "LA") or (mode == "P" and "transparency" in getattr(pil_img, "info", {})):
-            rgba = pil_img.convert("RGBA")
-            data = rgba.tobytes("raw", "RGBA")
-            qimg = QImage(data, rgba.width, rgba.height, rgba.width * 4, QImage.Format_RGBA8888).copy()
-        elif mode == "L":
-            # Grayscale 8-bit
-            data = pil_img.tobytes("raw", "L")
-            qimg = QImage(data, pil_img.width, pil_img.height, pil_img.width, QImage.Format_Grayscale8).copy()
-        else:
-            # Standard RGB conversion
-            rgb = pil_img.convert("RGB")
-            data = rgb.tobytes("raw", "RGB")
-            qimg = QImage(data, rgb.width, rgb.height, rgb.width * 3, QImage.Format_RGB888).copy()
-
-        return QPixmap.fromImage(qimg)
-    except Exception as e:
-        print(f"Error converting PIL Image to QPixmap: {e}")
-        return QPixmap()
+__all__ = ["get_image_info", "pil_to_qpixmap"]

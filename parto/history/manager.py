@@ -1,0 +1,109 @@
+# parto/history/manager.py
+"""
+Parto v0.3.0 - Centralized History & Undo/Redo Manager
+Author: Ali Kamrani (MRThugh)
+"""
+
+from __future__ import annotations
+from typing import List, Optional
+from PySide6.QtCore import QObject, Signal
+from .commands import Command
+
+
+class HistoryManager(QObject):
+    """
+    Manages undo/redo stacks, operation limits, and state notifications.
+    """
+    history_changed = Signal()
+
+    def __init__(self, max_history: int = 30, parent: Optional[QObject] = None):
+        super().__init__(parent)
+        self.max_history: int = max_history
+        self._undo_stack: List[Command] = []
+        self._redo_stack: List[Command] = []
+
+    @property
+    def can_undo(self) -> bool:
+        return len(self._undo_stack) > 0
+
+    @property
+    def can_redo(self) -> bool:
+        return len(self._redo_stack) > 0
+
+    @property
+    def undo_count(self) -> int:
+        return len(self._undo_stack)
+
+    @property
+    def redo_count(self) -> int:
+        return len(self._redo_stack)
+
+    def undo_description(self) -> str:
+        if self._undo_stack:
+            return f"Undo {self._undo_stack[-1].name}"
+        return "Undo"
+
+    def redo_description(self) -> str:
+        if self._redo_stack:
+            return f"Redo {self._redo_stack[-1].name}"
+        return "Redo"
+
+    @property
+    def undo_stack(self) -> list:
+        return self._undo_stack
+
+    @property
+    def redo_stack(self) -> list:
+        return self._redo_stack
+
+    def execute(self, command: Command) -> None:
+        """Execute command and push to history."""
+        command.redo()
+        self.push(command)
+
+    def push(self, command: Command) -> None:
+        """Add a newly executed command to history."""
+        self._undo_stack.append(command)
+        self._redo_stack.clear()
+
+        # Enforce history capacity
+        if len(self._undo_stack) > self.max_history:
+            self._undo_stack.pop(0)
+
+        self.history_changed.emit()
+
+    def undo(self) -> bool:
+        """Undo top command on the stack."""
+        if not self._undo_stack:
+            return False
+
+        cmd = self._undo_stack.pop()
+        try:
+            cmd.undo()
+            self._redo_stack.append(cmd)
+            self.history_changed.emit()
+            return True
+        except Exception as e:
+            print(f"[Parto History Error] Undo failed for {cmd.name}: {e}")
+            return False
+
+    def redo(self) -> bool:
+        """Redo top command on the redo stack."""
+        if not self._redo_stack:
+            return False
+
+        cmd = self._redo_stack.pop()
+        try:
+            cmd.redo()
+            self._undo_stack.append(cmd)
+            self.history_changed.emit()
+            return True
+        except Exception as e:
+            print(f"[Parto History Error] Redo failed for {cmd.name}: {e}")
+            return False
+
+    def clear(self) -> None:
+        """Clear all undo and redo history."""
+        self._undo_stack.clear()
+        self._redo_stack.clear()
+        self.history_changed.emit()

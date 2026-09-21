@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-09-21
+
+### Added
+- **Complete Modular Architecture (`parto/`)**:
+  - Replaced monolithic `window.py` with modular subsystem packages: `editor`, `image`, `history`, `shortcuts`, `tools`, `ui`, `utils`, `resources`, `workers`, and `themes`.
+  - Maintained 100% backward compatibility via root re-export shims (`window.py`, `editor.py`, `image.py`, `icons.py`).
+- **Multi-Layer Engine (`parto.image.layers`)**:
+  - Full layer stack architecture with non-destructive composition, per-layer opacity, visibility toggle, and layer ordering.
+  - Interactive Layers Panel with live thumbnail generation, add, duplicate, delete, reorder, and merge down operations.
+- **Command Pattern & Managed History (`parto.history`)**:
+  - Robust Command pattern (`Command`, `SnapshotCommand`, `AddLayerCommand`, `RemoveLayerCommand`, `ApplyAdjustmentCommand`, `ApplyFilterCommand`).
+  - Configurable history limit with bounded memory management and transactional undo/redo.
+- **Pluggable Interactive Canvas Tools (`parto.tools`)**:
+  - `MoveTool`: Freeform viewport panning and layer content repositioning.
+  - `CropTool`: 8-handle drag-to-resize selection with aspect-ratio constraints (Free, 1:1, 4:3, 16:9, 3:2) and boundary clamping.
+  - `BrushTool`: Freehand drawing directly onto active layer with configurable color and radius.
+  - `EyedropperTool`: Live pixel color sampling from composite canvas with RGB/RGBA coordinate inspection.
+- **Non-Blocking Background Worker (`parto.workers`)**:
+  - `ImageWorkerThread` with cancelable tasks and Qt signals for heavy operations (large file loading, blur/sharpen, format export).
+- **Centralized Shortcut Manager (`parto.shortcuts`)**:
+  - Comprehensive action registry with category grouping, conflict avoidance, and interactive Keyboard Shortcuts cheat sheet dialog (`Ctrl+/` or `F1`).
+- **Modern Theme System (`parto.themes`)**:
+  - Dynamic QSS stylesheet generation for 5 curated palettes: **Dark**, **Light**, **Graphite**, **Midnight**, and **Nord**.
+  - Dynamic vector icon recoloring based on active theme contrast metrics.
+- **Advanced Export Pipeline (`parto.image.export`)**:
+  - Comprehensive format support: PNG, JPEG (with white matte RGBA compositing), WebP (lossy & lossless), BMP, and TIFF.
+- **Extended Test Suite (`test_parto_v03.py`)**:
+  - 12 comprehensive unit and integration tests covering layer stacking, command history, brush strokes, eyedropper, shortcuts, and palettes (totaling 42 passed tests).
+
+### Changed
+- **Entry Point**: Modernized `main.py` to initialize `ThemeManager`, set application metadata, and load the new `MainWindow`.
+- **Status Bar & Tool Bar**: Split into dedicated modular components with responsive breadcrumbs, zoom slider, color swatch, and status notifications.
+
+---
+
 ## [0.2.0] - 2026-09-18
 
 ### Added

@@ -1,6 +1,6 @@
 # Parto (پرتو) — Lightweight Desktop Image Editor
 
-[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/MRThugh/Parto)
+[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](https://github.com/MRThugh/Parto)
 [![Python](https://img.shields.io/badge/python-3.10+-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![PySide6](https://img.shields.io/badge/GUI-PySide6%20%2F%20Qt-41CD52.svg?logo=qt&logoColor=white)](https://pypi.org/project/PySide6/)
 [![Pillow](https://img.shields.io/badge/imaging-Pillow-blue.svg)](https://python-pillow.org/)
@@ -10,40 +10,22 @@
 
 ---
 
-## Highlights of Version 0.2.0
+## Highlights of Version 0.3.0
 
-- **Fast & Minimal**: Near-instant launch time and low resource consumption.
-- **Refined User Interface**:
-  - Polished **Dark** and **Light** themes with smooth transition animations.
-  - Resolution-independent **vector icon system** replacing emoji icons with geometric vector graphics.
-  - Organized, logically grouped toolbar with intuitive keyboard shortcuts.
-- **Modern Welcome Screen**:
-  - Clean layout featuring format badges, drag-and-drop zone, and quick launch button.
-- **Image Cropping**:
-  - Interactive on-canvas crop rectangle with border bounds clamping.
-  - Aspect ratio constraints: **Free**, **1:1 (Square)**, **4:3 (Standard)**, and **16:9 (Widescreen)**.
-  - Dedicated crop control bar with Apply (`Enter`) and Cancel (`Esc`).
-- **Image Resizing**:
-  - Aspect ratio locking with automatic bidirectional dimension synchronization.
-  - One-click percentage presets: **25%**, **50%**, **75%**, **100%**, **150%**, and **200%**.
-  - Real-time resolution and megapixel computation.
-- **Transformations**:
-  - 90° counter-clockwise (`Ctrl+Shift+L`), 90° clockwise (`Ctrl+Shift+R`), and 180° rotation.
-  - Horizontal and vertical flipping.
-- **Color Adjustments**:
-  - Non-intrusive side-dock for **Brightness**, **Contrast**, and **Saturation**.
-  - Real-time preview with individual slider resets and percentage indicators.
-  - **Hold to View Original** Before/After comparison button.
-- **Photographic Filters**:
-  - **Grayscale**, **Sepia**, and **Invert** with full alpha-channel transparency preservation.
-  - Filter gallery with live preview and Before/After verification.
-- **Technical Image Properties**:
-  - Detailed metadata inspector displaying dimensions, aspect ratio, megapixels, color mode, transparency status, file size, and file path with copy-to-clipboard support.
-- **Reliable Undo / Redo**:
-  - Up to 30 history states tracking all transformations, adjustments, and crops.
-- **Status Bar & Pixel Inspector**:
-  - Live cursor pixel coordinates $(X, Y)$ and RGB/RGBA channel color inspection.
-  - Dynamic display of resolution, aspect ratio, color mode, format, and zoom level.
+- **Modular Architecture**: Complete redesign separating state, UI presentation, command history, and tool logic into a maintainable `parto/` package.
+- **Multi-Layer System**: Non-destructive layer stack with opacity controls, visibility toggles, duplicate, reorder, and merge operations.
+- **Transactional Undo / Redo**: Command pattern (`parto.history`) tracking all modifications with configurable history depth and bounded memory.
+- **Interactive Tool Palette**:
+  - **Move Tool (`V`)**: Viewport panning and layer offset movement.
+  - **Crop Tool (`C`)**: 8-handle interactive bounding box with aspect ratio presets (Free, 1:1, 4:3, 16:9, 3:2).
+  - **Brush Tool (`B`)**: Freehand drawing directly onto the active layer with configurable color and radius.
+  - **Eyedropper (`I`)**: Real-time pixel color inspection with direct active color selection.
+- **Dynamic Theming System**:
+  - 5 curated palettes: **Dark**, **Light**, **Graphite**, **Midnight**, and **Nord**.
+  - Adaptive contrast-aware vector icons.
+- **Asynchronous Worker Thread**: Non-blocking image processing pipeline (`parto.workers`) for heavy computations and file I/O.
+- **Centralized Keyboard Shortcut Registry**: Searchable keyboard shortcuts cheat sheet dialog (`Ctrl+/` or `F1`).
+- **Comprehensive Test Coverage**: 42 automated tests validating backward compatibility, layers, tools, history, and exports.
 
 ---
 
@@ -54,31 +36,41 @@ Parto supports a wide range of standard and modern image formats through Pillow 
 | Format | Extension | Read | Write | Notes |
 | :--- | :--- | :---: | :---: | :--- |
 | **PNG** | `.png` | Yes | Yes | Full transparency support |
-| **JPEG** | `.jpg`, `.jpeg` | Yes | Yes | Safe alpha compositing |
-| **WebP** | `.webp` | Yes | Yes | High compression & quality |
+| **JPEG** | `.jpg`, `.jpeg` | Yes | Yes | Safe alpha compositing with matte |
+| **WebP** | `.webp` | Yes | Yes | High compression & quality (lossy/lossless) |
 | **BMP** | `.bmp` | Yes | Yes | Bitmap images |
 | **TIFF** | `.tiff`, `.tif` | Yes | Yes | High dynamic range & print |
 | **HEIC** | `.heic` | Yes | No | Apple device photos |
 
 ---
 
-## Architecture & Code Structure
-
-Parto maintains a strict separation of concerns between core image processing and GUI presentation:
+## Architecture & Package Structure
 
 ```
 Parto/
-├── main.py            # Application entry point, High-DPI configuration, app metadata
-├── window.py          # MainWindow, Canvas (QGraphicsView), Dock, Dialogs, WelcomeScreen, Styles
-├── editor.py          # EditorEngine: Pillow-based transformation, adjustment, filter & history logic
-├── image.py           # Safe PIL-to-QPixmap conversions & metadata extraction
-├── icons.py           # Resolution-independent QPainter vector icon generation
-├── test_parto.py      # Comprehensive 30-point automated test suite (pytest)
-├── requirements.txt   # Python package dependencies
-├── logo.png           # Parto application branding icon
-├── LICENSE            # MIT License
-├── CHANGELOG.md       # Release notes and version history
-└── README.md          # Project documentation
+├── main.py                    # Application entry point, High-DPI configuration & ThemeManager bootstrap
+├── window.py                  # Backward-compatibility re-export shim for MainWindow
+├── editor.py                  # Backward-compatibility re-export shim for EditorEngine
+├── image.py                   # Backward-compatibility re-export shim for conversions & metadata
+├── icons.py                   # Backward-compatibility re-export shim for vector icons
+├── test_parto.py              # Baseline compatibility test suite (30 tests)
+├── test_parto_v03.py          # Parto v0.3.0 subsystem test suite (12 tests)
+├── parto/                     # Core application package
+│   ├── editor/                # Document model, Canvas, SelectionBox geometry & EditorEngine
+│   ├── image/                 # Layers, LayerStack, Filters, Transforms & Safe Export
+│   ├── history/               # Command pattern base, Snapshot & Domain Commands, HistoryManager
+│   ├── shortcuts/             # Centralized ShortcutManager & ShortcutDefinition registry
+│   ├── tools/                 # BaseTool, MoveTool, CropTool, BrushTool, EyedropperTool
+│   ├── themes/                # ThemeManager singleton & dynamic palettes (Dark, Light, Graphite, Midnight, Nord)
+│   ├── workers/               # ImageWorkerThread with cancellation and Qt signals
+│   ├── resources/             # High-DPI QPainter vector icons and logo loader
+│   ├── ui/                    # MainWindow, ToolBar, StatusBar, Menus, Panels & Dialogs
+│   └── utils/                 # Path helpers, settings persistence & error formatting
+├── requirements.txt           # Python package dependencies
+├── logo.png                   # Parto application branding icon
+├── LICENSE                    # MIT License
+├── CHANGELOG.md               # Release notes and version history
+└── README.md                  # Project documentation
 ```
 
 ---
