@@ -259,7 +259,7 @@ class LayersDock(QDockWidget):
             self._updating = False
 
     def _on_opacity_slider_pressed(self):
-        self._opacity_snap = self.document._create_snapshot()
+        self._opacity_snap = self.document.create_snapshot()
 
     def _on_opacity_slider_changed(self, val: int):
         self.opacity_label.setText(f"{val}%")
@@ -269,7 +269,7 @@ class LayersDock(QDockWidget):
 
     def _on_opacity_slider_released(self):
         if hasattr(self, "_opacity_snap") and self._opacity_snap is not None:
-            self.document._record_operation("Change Layer Opacity", self._opacity_snap)
+            self.document.record_operation("Change Layer Opacity", self._opacity_snap)
             self._opacity_snap = None
 
     def _on_add_layer(self):

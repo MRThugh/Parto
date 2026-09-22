@@ -207,6 +207,18 @@ class Document(QObject):
         return success, err
 
     # Snapshot & History Management
+    def create_snapshot(self) -> Dict[str, Any]:
+        """Capture deep clone of current state for undo/redo (public interface)."""
+        return self._create_snapshot()
+
+    def restore_snapshot(self, snapshot: Dict[str, Any]) -> None:
+        """Restore state from snapshot (public interface)."""
+        self._restore_snapshot(snapshot)
+
+    def record_operation(self, name: str, before_snap: Dict[str, Any]) -> None:
+        """Record an operation and its pre-state to history (public interface)."""
+        self._record_operation(name, before_snap)
+
     def _create_snapshot(self) -> Dict[str, Any]:
         """Capture deep clone of current state for undo/redo."""
         return {
@@ -221,7 +233,26 @@ class Document(QObject):
         self._width = snapshot["width"]
         self._height = snapshot["height"]
         if "layer_stack" in snapshot and isinstance(snapshot["layer_stack"], LayerStack):
-            self.layer_stack = snapshot["layer_stack"].clone()
+            target_stack = snapshot["layer_stack"].clone()
+            existing_by_id = {lay.id: lay for lay in self.layer_stack}
+            new_layers = []
+            for lay in target_stack:
+                if lay.id in existing_by_id:
+                    orig = existing_by_id[lay.id]
+                    orig.name = lay.name
+                    orig.image = lay.image.copy() if lay.image is not None else None
+                    orig.visible = lay.visible
+                    orig.opacity = lay.opacity
+                    orig.blend_mode = lay.blend_mode
+                    orig.offset_x = lay.offset_x
+                    orig.offset_y = lay.offset_y
+                    new_layers.append(orig)
+                else:
+                    new_layers.append(lay)
+            self.layer_stack._layers = new_layers
+            self.layer_stack.width = self._width
+            self.layer_stack.height = self._height
+            self.layer_stack.set_active_index(snapshot.get("active_layer_index", target_stack.active_index))
         elif "layers" in snapshot:
             self.layer_stack = LayerStack(self._width, self._height)
             self.layer_stack._layers = [lay.clone() for lay in snapshot["layers"]]
@@ -257,14 +288,19 @@ class Document(QObject):
     def add_layer(
         self,
         name: Optional[str] = None,
-        image: Optional[Image.Image] = None,
+        image: Optional[Any] = None,
     ) -> Layer:
         """Add new layer above current active layer."""
         snap = self._create_snapshot()
         idx = self.layer_stack.active_index + 1
         num = len(self.layer_stack) + 1
         layer_name = name or f"Layer {num}"
-        img = image if image is not None else Image.new("RGBA", (self._width, self._height), (0, 0, 0, 0))
+        if isinstance(image, (tuple, list)):
+            img = Image.new("RGBA", (self._width, self._height), tuple(image))
+        elif isinstance(image, Image.Image):
+            img = image
+        else:
+            img = Image.new("RGBA", (self._width, self._height), (0, 0, 0, 0))
         new_lay = self.layer_stack.insert_layer(idx, image_or_layer=img, name=layer_name)
         self._record_operation(f"Add {layer_name}", snap)
         self.invalidate_composite()

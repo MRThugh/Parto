@@ -52,8 +52,10 @@ class Layer:
         self.offset_y: int = int(offset_y)
 
         if actual_image is not None:
-            if actual_image.mode != "RGBA":
-                self.image: Image.Image = actual_image.convert("RGBA")
+            if isinstance(actual_image, (tuple, list)):
+                self.image: Image.Image = Image.new("RGBA", (100, 100), tuple(actual_image))
+            elif actual_image.mode != "RGBA":
+                self.image = actual_image.convert("RGBA")
             else:
                 self.image = actual_image.copy()
         else:
@@ -194,6 +196,8 @@ class LayerStack:
             img = image_or_layer
             if img is None:
                 img = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
+            elif isinstance(img, (tuple, list)):
+                img = Image.new("RGBA", (self.width, self.height), tuple(img))
             layer = Layer(name=name, image=img)
         target_idx = max(0, min(index, len(self._layers)))
         self._layers.insert(target_idx, layer)
@@ -247,11 +251,16 @@ class LayerStack:
             return None
         lower = self._layers[index - 1]
         upper = self._layers[index]
-        comp = compose_layers([lower, upper], (self.width, self.height))
+        temp_lower = lower.clone()
+        temp_lower.visible = True
+        temp_upper = upper.clone()
+        temp_upper.visible = True
+        comp = compose_layers([temp_lower, temp_upper], (self.width, self.height))
         lower.image = comp
         lower.offset_x = 0
         lower.offset_y = 0
         lower.opacity = 1.0
+        lower.visible = True
         self._layers.pop(index)
         self._active_index = index - 1
         return lower

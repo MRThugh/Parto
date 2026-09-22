@@ -11,6 +11,7 @@ from .commands import Command
 
 
 _CLEAN_MARKER = object()
+_UNREACHABLE_MARKER = object()
 
 
 class HistoryManager(QObject):
@@ -25,16 +26,27 @@ class HistoryManager(QObject):
         self._undo_stack: List[Command] = []
         self._redo_stack: List[Command] = []
         self._clean_marker: Any = _CLEAN_MARKER
+        self._current_revision: int = 0
+        self._base_revision: int = 0
+        self._clean_revision: int = 0
+
+    @property
+    def current_revision(self) -> int:
+        return self._current_revision
 
     @property
     def is_clean(self) -> bool:
         """Return True if the current history state matches the clean save point."""
-        curr = self._undo_stack[-1] if self._undo_stack else _CLEAN_MARKER
-        return curr is self._clean_marker
+        if self._clean_marker is _UNREACHABLE_MARKER:
+            return False
+        if self._clean_revision < self._base_revision:
+            return False
+        return self._current_revision == self._clean_revision
 
     def set_clean(self) -> None:
         """Mark the current head of the undo stack as the clean save point."""
         self._clean_marker = self._undo_stack[-1] if self._undo_stack else _CLEAN_MARKER
+        self._clean_revision = self._current_revision
 
     @property
     def can_undo(self) -> bool:
@@ -77,12 +89,17 @@ class HistoryManager(QObject):
 
     def push(self, command: Command) -> None:
         """Add a newly executed command to history."""
+        self._current_revision += 1
+        setattr(command, "_revision", self._current_revision)
         self._undo_stack.append(command)
         self._redo_stack.clear()
 
-        # Enforce history capacity
+        # Enforce history capacity safely while preserving clean marker integrity
         if len(self._undo_stack) > self.max_history:
-            self._undo_stack.pop(0)
+            evicted = self._undo_stack.pop(0)
+            self._base_revision = getattr(evicted, "_revision", self._base_revision + 1)
+            if self._clean_marker is evicted or self._clean_marker is _CLEAN_MARKER:
+                self._clean_marker = _UNREACHABLE_MARKER
 
         self.history_changed.emit()
 
@@ -96,10 +113,15 @@ class HistoryManager(QObject):
             cmd.undo()
             self._undo_stack.pop()
             self._redo_stack.append(cmd)
+            if self._undo_stack:
+                self._current_revision = getattr(self._undo_stack[-1], "_revision", self._base_revision)
+            else:
+                self._current_revision = self._base_revision
             self.history_changed.emit()
             return True
         except Exception as e:
-            print(f"[Parto History Error] Undo failed for {cmd.name}: {e}")
+            import logging
+            logging.getLogger("parto.history").error(f"Undo failed for {cmd.name}: {e}")
             return False
 
     def redo(self) -> bool:
@@ -112,10 +134,12 @@ class HistoryManager(QObject):
             cmd.redo()
             self._redo_stack.pop()
             self._undo_stack.append(cmd)
+            self._current_revision = getattr(cmd, "_revision", self._current_revision)
             self.history_changed.emit()
             return True
         except Exception as e:
-            print(f"[Parto History Error] Redo failed for {cmd.name}: {e}")
+            import logging
+            logging.getLogger("parto.history").error(f"Redo failed for {cmd.name}: {e}")
             return False
 
     def clear(self) -> None:
@@ -123,4 +147,7 @@ class HistoryManager(QObject):
         self._undo_stack.clear()
         self._redo_stack.clear()
         self._clean_marker = _CLEAN_MARKER
+        self._current_revision = 0
+        self._base_revision = 0
+        self._clean_revision = 0
         self.history_changed.emit()
