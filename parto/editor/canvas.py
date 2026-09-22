@@ -246,7 +246,7 @@ class Canvas(QGraphicsView):
 
         # Pixel inspection
         if self.document.has_image:
-            x, y = int(scene_pos.x()), int(scene_pos.y())
+            x, y = int(math.floor(scene_pos.x())), int(math.floor(scene_pos.y()))
             if 0 <= x < self.document.width and 0 <= y < self.document.height:
                 comp = self.document.get_composite()
                 if comp:
@@ -258,7 +258,7 @@ class Canvas(QGraphicsView):
                             b = px[2] if len(px) > 2 else r
                             a = px[3] if len(px) > 3 else 255
                             self.pixel_inspected.emit(x, y, r, g, b, a)
-                    except Exception:
+                    except (IndexError, ValueError):
                         pass
 
         if self.active_tool and self.active_tool.mouse_move(event, scene_pos, self):

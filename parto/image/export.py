@@ -76,7 +76,7 @@ def save_image_file(
 
         return True, None
 
-    except Exception as e:
+    except (OSError, ValueError, KeyError) as e:
         err = f"Failed to save image to {filepath}: {e}"
         print(f"[Parto Error] {err}")
         return False, str(e)

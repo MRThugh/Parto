@@ -7,7 +7,7 @@ Author: Ali Kamrani (MRThugh)
 
 from __future__ import annotations
 import os
-from typing import Optional, List, Tuple, Callable
+from typing import Any, Optional, List, Tuple, Callable
 from PIL import Image
 from PySide6.QtCore import Qt, QPoint
 from PySide6.QtGui import QCloseEvent, QDragEnterEvent, QDropEvent
@@ -321,7 +321,7 @@ class MainWindow(QMainWindow):
         success = self.document.load_file(path)
         if success:
             comp = self.document.get_composite()
-            self.engine._original_image = comp.copy() if comp else None
+            self.engine.set_original_image(comp)
             self.canvas.zoom_fit()
             self.toast.show_message(f"Opened {os.path.basename(path)}")
         else:

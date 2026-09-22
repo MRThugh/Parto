@@ -65,6 +65,14 @@ class Document(QObject):
         return self._is_modified
 
     @property
+    def modified(self) -> bool:
+        return self._is_modified
+
+    @modified.setter
+    def modified(self, val: bool) -> None:
+        self.set_modified(val)
+
+    @property
     def layers(self) -> List[Layer]:
         return self.layer_stack.layers
 
@@ -99,11 +107,17 @@ class Document(QObject):
         return len(self.layer_stack) > 0 and self._width > 0 and self._height > 0
 
     def set_modified(self, val: bool):
+        if not val:
+            self.history.set_clean()
         if self._is_modified != val:
             self._is_modified = val
             self.modified_changed.emit(val)
 
     def _on_history_changed(self):
+        new_modified = not self.history.is_clean
+        if self._is_modified != new_modified:
+            self._is_modified = new_modified
+            self.modified_changed.emit(new_modified)
         self.document_changed.emit()
 
     def invalidate_composite(self):
@@ -212,7 +226,6 @@ class Document(QObject):
             self.layer_stack = LayerStack(self._width, self._height)
             self.layer_stack._layers = [lay.clone() for lay in snapshot["layers"]]
             self.layer_stack.set_active_index(snapshot.get("active_layer_index", 0))
-        self.set_modified(True)
         self.invalidate_composite()
         self.layer_selection_changed.emit(self.layer_stack.active_index)
 
@@ -227,6 +240,14 @@ class Document(QObject):
         )
         self.history.push(cmd)
         self.set_modified(True)
+
+    def undo(self) -> bool:
+        """Undo last operation."""
+        return self.history.undo()
+
+    def redo(self) -> bool:
+        """Redo previously undone operation."""
+        return self.history.redo()
 
     # Layer Management
     def set_active_layer_index(self, index: int) -> None:
@@ -313,6 +334,8 @@ class Document(QObject):
 
     def set_layer_visible(self, index: int, visible: bool) -> None:
         if 0 <= index < len(self.layer_stack):
+            if self.layer_stack[index].visible == visible:
+                return
             snap = self._create_snapshot()
             self.layer_stack[index].visible = visible
             self._record_operation("Toggle Layer Visibility", snap)
@@ -320,12 +343,15 @@ class Document(QObject):
 
     def set_layer_opacity(self, index: int, opacity: float, record_history: bool = True) -> None:
         if 0 <= index < len(self.layer_stack):
+            clamped = max(0.0, min(1.0, float(opacity)))
+            if abs(self.layer_stack[index].opacity - clamped) < 1e-4:
+                return
             if record_history:
                 snap = self._create_snapshot()
-                self.layer_stack[index].set_opacity(opacity)
+                self.layer_stack[index].set_opacity(clamped)
                 self._record_operation("Change Layer Opacity", snap)
             else:
-                self.layer_stack[index].set_opacity(opacity)
+                self.layer_stack[index].set_opacity(clamped)
             self.invalidate_composite()
 
     # Transformations (Operate on all layers to maintain document size)
@@ -377,8 +403,10 @@ class Document(QObject):
         """Resize entire document and all layers."""
         if not self.has_image:
             return
-        snap = self._create_snapshot()
         nw, nh = max(1, int(new_width)), max(1, int(new_height))
+        if nw == self._width and nh == self._height:
+            return
+        snap = self._create_snapshot()
         self._width = nw
         self._height = nh
         self.layer_stack.width = nw
@@ -392,20 +420,32 @@ class Document(QObject):
         """Crop entire document to rectangle (left, top, right, bottom)."""
         if not self.has_image:
             return
-        snap = self._create_snapshot()
         left, top, right, bottom = rect
-        new_w = max(1, right - left)
-        new_h = max(1, bottom - top)
+        x1 = max(0, min(int(left), self._width))
+        y1 = max(0, min(int(top), self._height))
+        x2 = max(0, min(int(right), self._width))
+        y2 = max(0, min(int(bottom), self._height))
 
+        if x2 <= x1 or y2 <= y1:
+            return  # Invalid crop rectangle: do nothing, no history
+
+        new_w = x2 - x1
+        new_h = y2 - y1
+
+        if x1 == 0 and y1 == 0 and new_w == self._width and new_h == self._height:
+            return  # Full canvas crop: no-op, no history
+
+        snap = self._create_snapshot()
         self._width = new_w
         self._height = new_h
         self.layer_stack.width = new_w
         self.layer_stack.height = new_h
 
+        clamped_rect = (x1, y1, x2, y2)
         for lay in self.layer_stack:
-            lay.image = crop_image(lay.image, rect)
-            lay.offset_x = max(0, lay.offset_x - left)
-            lay.offset_y = max(0, lay.offset_y - top)
+            lay.image = crop_image(lay.image, clamped_rect)
+            lay.offset_x = max(0, lay.offset_x - x1)
+            lay.offset_y = max(0, lay.offset_y - y1)
 
         self._record_operation(f"Crop ({new_w} × {new_h})", snap)
         self.invalidate_composite()
@@ -419,8 +459,15 @@ class Document(QObject):
     ) -> None:
         """Apply color adjustments to active layer."""
         active = self.active_layer
-        if active is None:
+        if active is None or not self.has_image:
             return
+        if (
+            abs(brightness - 1.0) < 1e-4
+            and abs(contrast - 1.0) < 1e-4
+            and abs(saturation - 1.0) < 1e-4
+            and abs(sharpness - 1.0) < 1e-4
+        ):
+            return  # 0% adjustment: no-op, no history
         snap = self._create_snapshot()
         active.image = apply_color_adjustments(
             active.image,
@@ -462,7 +509,10 @@ class Document(QObject):
     def apply_filter(self, filter_name: str) -> None:
         """Apply photographic filter to active layer."""
         active = self.active_layer
-        if active is None:
+        if active is None or not self.has_image:
+            return
+        from ..image.filters import FILTER_MAP
+        if filter_name.lower() not in FILTER_MAP:
             return
         snap = self._create_snapshot()
         active.image = apply_filter(active.image, filter_name)

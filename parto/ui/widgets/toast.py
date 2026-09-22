@@ -73,6 +73,6 @@ class Toast(QWidget):
     def _on_fade_out_finished(self):
         try:
             self.anim.finished.disconnect(self._on_fade_out_finished)
-        except Exception:
+        except RuntimeError:
             pass
         self.hide()

@@ -66,7 +66,7 @@ def get_image_metadata(image: Optional[Image.Image], filepath: Optional[str] = N
                 file_size_str = f"{bytes_size / 1024:.1f} KB"
             else:
                 file_size_str = f"{bytes_size / (1024 * 1024):.2f} MB"
-        except Exception:
+        except OSError:
             pass
 
     fmt = image.format or (os.path.splitext(filepath)[1][1:].upper() if filepath else "RAW")

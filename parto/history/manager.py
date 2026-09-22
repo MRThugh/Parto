@@ -5,9 +5,12 @@ Author: Ali Kamrani (MRThugh)
 """
 
 from __future__ import annotations
-from typing import List, Optional
+from typing import Any, List, Optional
 from PySide6.QtCore import QObject, Signal
 from .commands import Command
+
+
+_CLEAN_MARKER = object()
 
 
 class HistoryManager(QObject):
@@ -21,6 +24,17 @@ class HistoryManager(QObject):
         self.max_history: int = max_history
         self._undo_stack: List[Command] = []
         self._redo_stack: List[Command] = []
+        self._clean_marker: Any = _CLEAN_MARKER
+
+    @property
+    def is_clean(self) -> bool:
+        """Return True if the current history state matches the clean save point."""
+        curr = self._undo_stack[-1] if self._undo_stack else _CLEAN_MARKER
+        return curr is self._clean_marker
+
+    def set_clean(self) -> None:
+        """Mark the current head of the undo stack as the clean save point."""
+        self._clean_marker = self._undo_stack[-1] if self._undo_stack else _CLEAN_MARKER
 
     @property
     def can_undo(self) -> bool:
@@ -77,9 +91,10 @@ class HistoryManager(QObject):
         if not self._undo_stack:
             return False
 
-        cmd = self._undo_stack.pop()
+        cmd = self._undo_stack[-1]
         try:
             cmd.undo()
+            self._undo_stack.pop()
             self._redo_stack.append(cmd)
             self.history_changed.emit()
             return True
@@ -92,9 +107,10 @@ class HistoryManager(QObject):
         if not self._redo_stack:
             return False
 
-        cmd = self._redo_stack.pop()
+        cmd = self._redo_stack[-1]
         try:
             cmd.redo()
+            self._redo_stack.pop()
             self._undo_stack.append(cmd)
             self.history_changed.emit()
             return True
@@ -106,4 +122,5 @@ class HistoryManager(QObject):
         """Clear all undo and redo history."""
         self._undo_stack.clear()
         self._redo_stack.clear()
+        self._clean_marker = _CLEAN_MARKER
         self.history_changed.emit()

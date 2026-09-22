@@ -126,7 +126,7 @@ class ThemeManager(QObject):
             anim.finished.connect(_cleanup)
             overlay._theme_anim = anim
             anim.start()
-        except Exception:
+        except (RuntimeError, AttributeError):
             # Fallback to direct theme setting if graphical grab/animation is unsupported
             self.set_theme(theme_key, app)
 

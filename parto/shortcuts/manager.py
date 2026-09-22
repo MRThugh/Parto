@@ -89,6 +89,15 @@ class ShortcutManager:
         defn = self._shortcuts.get(action_id)
         if not defn:
             return False
+
+        if new_key_sequence:
+            for existing_id, existing_defn in self._shortcuts.items():
+                if existing_id != action_id and existing_defn.key_sequence and existing_defn.key_sequence.lower() == new_key_sequence.lower():
+                    import logging
+                    logging.getLogger("parto.shortcuts").warning(
+                        f"[Parto Shortcut Conflict] Shortcut '{new_key_sequence}' remapped for '{action_id}' conflicts with '{existing_id}'"
+                    )
+
         defn.key_sequence = new_key_sequence
         if defn.action is not None:
             if new_key_sequence:

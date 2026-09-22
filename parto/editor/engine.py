@@ -56,9 +56,29 @@ class EditorEngine:
     def original_image(self) -> Optional[Image.Image]:
         return self._original_image
 
+    @original_image.setter
+    def original_image(self, img: Optional[Image.Image]) -> None:
+        self._original_image = img.copy() if img is not None else None
+
+    def set_original_image(self, img: Optional[Image.Image]) -> None:
+        """Set the baseline original image safely."""
+        self.original_image = img
+
     @property
     def filepath(self) -> Optional[str]:
         return self._document.filepath
+
+    @property
+    def is_modified(self) -> bool:
+        return self._document.is_modified
+
+    @property
+    def modified(self) -> bool:
+        return self._document.is_modified
+
+    @modified.setter
+    def modified(self, val: bool) -> None:
+        self._document.set_modified(val)
 
     @property
     def can_undo(self) -> bool:

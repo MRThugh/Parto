@@ -46,7 +46,7 @@ def pil_to_qimage(pil_img: Optional[Image.Image]) -> Optional[QImage]:
             data = rgb.tobytes("raw", "RGB")
             return QImage(data, rgb.width, rgb.height, rgb.width * 3, QImage.Format_RGB888).copy()
 
-    except Exception as e:
+    except (ValueError, TypeError, OSError, RuntimeError) as e:
         print(f"[Parto Error] pil_to_qimage failed: {e}")
         return None
 
@@ -80,7 +80,7 @@ def qimage_to_pil(qimg: Optional[QImage]) -> Optional[Image.Image]:
         # ptr is a sip/shiboken buffer; bytes() creates a safe Python byte copy
         raw_bytes = bytes(ptr)
         return Image.frombuffer("RGBA", (w, h), raw_bytes, "raw", "RGBA", 0, 1).copy()
-    except Exception as e:
+    except (ValueError, TypeError, RuntimeError) as e:
         print(f"[Parto Error] qimage_to_pil failed: {e}")
         return None
 
@@ -93,7 +93,7 @@ def pil_to_numpy(pil_img: Optional[Image.Image]) -> Optional[np.ndarray]:
         return None
     try:
         return np.array(pil_img)
-    except Exception as e:
+    except (ValueError, TypeError) as e:
         print(f"[Parto Error] pil_to_numpy failed: {e}")
         return None
 
@@ -110,6 +110,6 @@ def numpy_to_pil(arr: Optional[np.ndarray], mode: Optional[str] = None) -> Optio
         if mode:
             return Image.fromarray(arr, mode=mode)
         return Image.fromarray(arr)
-    except Exception as e:
+    except (ValueError, TypeError) as e:
         print(f"[Parto Error] numpy_to_pil failed: {e}")
         return None

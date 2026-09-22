@@ -139,6 +139,19 @@ def filter_emboss(image: Image.Image) -> Image.Image:
     return image.filter(ImageFilter.EMBOSS)
 
 
+FILTER_MAP = {
+    "grayscale": filter_grayscale,
+    "sepia": filter_sepia,
+    "invert": filter_invert,
+    "blur": filter_blur,
+    "sharpen": filter_sharpen,
+    "edge_detect": filter_edge_detect,
+    "edge": filter_edge_detect,
+    "find_edges": filter_edge_detect,
+    "emboss": filter_emboss,
+}
+
+
 def apply_filter(image: Image.Image, filter_name: str) -> Image.Image:
     """Dispatch filter application by name."""
     fn = filter_name.lower().strip()

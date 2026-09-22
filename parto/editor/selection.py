@@ -47,7 +47,7 @@ class SelectionBox:
                     parts = key.split(":")
                     if len(parts) == 2:
                         self.aspect_ratio = float(parts[0]) / float(parts[1])
-                except Exception:
+                except (ValueError, ZeroDivisionError):
                     self.aspect_ratio = None
         else:
             self.aspect_ratio = None

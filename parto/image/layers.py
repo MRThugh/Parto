@@ -6,7 +6,7 @@ Author: Ali Kamrani (MRThugh)
 
 from __future__ import annotations
 import uuid
-from typing import List, Tuple, Optional
+from typing import Any, List, Tuple, Optional
 from PIL import Image
 import numpy as np
 
@@ -249,6 +249,9 @@ class LayerStack:
         upper = self._layers[index]
         comp = compose_layers([lower, upper], (self.width, self.height))
         lower.image = comp
+        lower.offset_x = 0
+        lower.offset_y = 0
+        lower.opacity = 1.0
         self._layers.pop(index)
         self._active_index = index - 1
         return lower
