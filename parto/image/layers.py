@@ -131,17 +131,23 @@ def compose_layers(
 class LayerStack:
     """
     Self-contained layer collection managing stacking order, active layer,
-    and composite generation.
+    and composite generation. Serves as the single authoritative layer state.
     """
 
     def __init__(self, width: int, height: int):
-        self.width = width
-        self.height = height
+        self.width = max(1, int(width))
+        self.height = max(1, int(height))
         self._layers: List[Layer] = []
         self._active_index: int = -1
 
     def __len__(self) -> int:
         return len(self._layers)
+
+    def __iter__(self):
+        return iter(self._layers)
+
+    def __getitem__(self, index: int) -> Layer:
+        return self._layers[index]
 
     @property
     def layers(self) -> List[Layer]:
@@ -157,7 +163,18 @@ class LayerStack:
             return self._layers[self._active_index]
         return None
 
+    def set_active_index(self, index: int) -> bool:
+        """Update active layer index within valid bounds."""
+        if 0 <= index < len(self._layers):
+            self._active_index = index
+            return True
+        elif not self._layers:
+            self._active_index = -1
+            return True
+        return False
+
     def add_layer(self, image_or_layer: Any = None, name: str = "Layer", **kwargs) -> Layer:
+        """Append a new or existing layer to the top of the stack and activate it."""
         if isinstance(image_or_layer, Layer):
             layer = image_or_layer
         else:
@@ -169,7 +186,32 @@ class LayerStack:
         self._active_index = len(self._layers) - 1
         return layer
 
+    def insert_layer(self, index: int, image_or_layer: Any = None, name: str = "Layer") -> Layer:
+        """Insert a layer at the specified index."""
+        if isinstance(image_or_layer, Layer):
+            layer = image_or_layer
+        else:
+            img = image_or_layer
+            if img is None:
+                img = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
+            layer = Layer(name=name, image=img)
+        target_idx = max(0, min(index, len(self._layers)))
+        self._layers.insert(target_idx, layer)
+        self._active_index = target_idx
+        return layer
+
+    def duplicate_layer(self, index: int) -> Optional[Layer]:
+        """Duplicate layer at index and insert it directly above."""
+        if 0 <= index < len(self._layers):
+            src = self._layers[index]
+            dup = src.duplicate()
+            self._layers.insert(index + 1, dup)
+            self._active_index = index + 1
+            return dup
+        return None
+
     def remove_layer(self, index: int) -> Optional[Layer]:
+        """Remove layer at index and clamp active index."""
         if 0 <= index < len(self._layers):
             removed = self._layers.pop(index)
             if self._active_index >= len(self._layers):
@@ -178,22 +220,29 @@ class LayerStack:
         return None
 
     def move_layer_down(self, index: int) -> bool:
+        """Move layer downward (towards bottom/background)."""
         if 0 < index < len(self._layers):
             self._layers[index], self._layers[index - 1] = self._layers[index - 1], self._layers[index]
             if self._active_index == index:
                 self._active_index = index - 1
+            elif self._active_index == index - 1:
+                self._active_index = index
             return True
         return False
 
     def move_layer_up(self, index: int) -> bool:
+        """Move layer upward (towards top of stack)."""
         if 0 <= index < len(self._layers) - 1:
             self._layers[index], self._layers[index + 1] = self._layers[index + 1], self._layers[index]
             if self._active_index == index:
                 self._active_index = index + 1
+            elif self._active_index == index + 1:
+                self._active_index = index
             return True
         return False
 
     def merge_down(self, index: int) -> Optional[Layer]:
+        """Merge layer at index into the layer beneath it."""
         if index <= 0 or index >= len(self._layers):
             return None
         lower = self._layers[index - 1]
@@ -204,6 +253,19 @@ class LayerStack:
         self._active_index = index - 1
         return lower
 
+    def clear(self) -> None:
+        """Clear all layers."""
+        self._layers.clear()
+        self._active_index = -1
+
+    def clone(self, preserve_ids: bool = True) -> LayerStack:
+        """Create a deep snapshot clone of the entire layer stack."""
+        new_stack = LayerStack(self.width, self.height)
+        new_stack._layers = [lay.clone(preserve_id=preserve_ids) for lay in self._layers]
+        new_stack._active_index = self._active_index
+        return new_stack
+
     def composite(self) -> Image.Image:
+        """Render composite image of all visible layers."""
         return compose_layers(self._layers, (self.width, self.height))
 

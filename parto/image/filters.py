@@ -88,22 +88,54 @@ def filter_invert(image: Image.Image) -> Image.Image:
 
 
 def filter_blur(image: Image.Image, radius: float = 2.0) -> Image.Image:
-    """Gaussian blur filter."""
+    """Gaussian blur filter preserving transparency."""
+    if image.mode in ("RGBA", "LA"):
+        alpha = image.split()[-1]
+        rgb = image.convert("RGB").filter(ImageFilter.GaussianBlur(radius=radius))
+        r, g, b = rgb.split()
+        return Image.merge("RGBA", (r, g, b, alpha))
+    elif image.mode == "P":
+        image = image.convert("RGBA" if "transparency" in getattr(image, "info", {}) else "RGB")
+        return filter_blur(image, radius=radius)
     return image.filter(ImageFilter.GaussianBlur(radius=radius))
 
 
 def filter_sharpen(image: Image.Image) -> Image.Image:
-    """Sharpen filter."""
+    """Sharpen filter preserving transparency."""
+    if image.mode in ("RGBA", "LA"):
+        alpha = image.split()[-1]
+        rgb = image.convert("RGB").filter(ImageFilter.SHARPEN)
+        r, g, b = rgb.split()
+        return Image.merge("RGBA", (r, g, b, alpha))
+    elif image.mode == "P":
+        image = image.convert("RGBA" if "transparency" in getattr(image, "info", {}) else "RGB")
+        return filter_sharpen(image)
     return image.filter(ImageFilter.SHARPEN)
 
 
 def filter_edge_detect(image: Image.Image) -> Image.Image:
-    """Edge detection filter."""
+    """Edge detection filter preserving transparency."""
+    if image.mode in ("RGBA", "LA"):
+        alpha = image.split()[-1]
+        rgb = image.convert("RGB").filter(ImageFilter.FIND_EDGES)
+        r, g, b = rgb.split()
+        return Image.merge("RGBA", (r, g, b, alpha))
+    elif image.mode == "P":
+        image = image.convert("RGBA" if "transparency" in getattr(image, "info", {}) else "RGB")
+        return filter_edge_detect(image)
     return image.filter(ImageFilter.FIND_EDGES)
 
 
 def filter_emboss(image: Image.Image) -> Image.Image:
-    """Emboss filter."""
+    """Emboss filter preserving transparency."""
+    if image.mode in ("RGBA", "LA"):
+        alpha = image.split()[-1]
+        rgb = image.convert("RGB").filter(ImageFilter.EMBOSS)
+        r, g, b = rgb.split()
+        return Image.merge("RGBA", (r, g, b, alpha))
+    elif image.mode == "P":
+        image = image.convert("RGBA" if "transparency" in getattr(image, "info", {}) else "RGB")
+        return filter_emboss(image)
     return image.filter(ImageFilter.EMBOSS)
 
 

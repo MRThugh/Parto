@@ -70,7 +70,7 @@ class MainWindow(QMainWindow):
 
         # Document Model & Processing Engine
         self.document = Document(parent=self)
-        self.engine = EditorEngine()
+        self.engine = EditorEngine(document=self.document)
         self.async_runner = AsyncOperationRunner(parent=self)
 
         # Interactive Tools
@@ -320,10 +320,8 @@ class MainWindow(QMainWindow):
 
         success = self.document.load_file(path)
         if success:
-            try:
-                self.engine.load_image(path)
-            except Exception:
-                pass
+            comp = self.document.get_composite()
+            self.engine._original_image = comp.copy() if comp else None
             self.canvas.zoom_fit()
             self.toast.show_message(f"Opened {os.path.basename(path)}")
         else:
@@ -522,17 +520,7 @@ class MainWindow(QMainWindow):
         """
         if hasattr(self, "document") and self.document.has_image:
             self.document.remove_background(tolerance=tolerance, feather_radius=feather_radius)
-            if hasattr(self, "engine"):
-                try:
-                    self.engine.remove_background(tolerance=tolerance, feather_radius=feather_radius)
-                except Exception:
-                    pass
-            self.canvas.update()
-            self.statusbar.set_status("Removed background")
-            self.toast.show_message("Background removed")
-        elif hasattr(self, "engine") and getattr(self.engine, "current_image", None):
-            self.engine.remove_background(tolerance=tolerance, feather_radius=feather_radius)
-            self.canvas.update()
+            self.canvas.update_composite_pixmap()
             self.statusbar.set_status("Removed background")
             self.toast.show_message("Background removed")
 

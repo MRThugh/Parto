@@ -10,7 +10,7 @@ from typing import List, Optional, Tuple, Dict, Any
 from PIL import Image
 from PySide6.QtCore import QObject, Signal
 
-from ..image.layers import Layer, compose_layers
+from ..image.layers import Layer, LayerStack, compose_layers
 from ..image.transforms import (
     rotate_90,
     rotate_180,
@@ -30,21 +30,21 @@ class Document(QObject):
     """
     Central document state representing multi-layer image data, canvas dimensions,
     active layer selection, file persistence, and undo/redo operations.
+    Authoritatively backed by LayerStack.
     """
     document_changed = Signal()
     layer_selection_changed = Signal(int)
     modified_changed = Signal(bool)
 
-    def __init__(self, parent: Optional[QObject] = None):
+    def __init__(self, parent: Optional[QObject] = None, max_history: int = 30):
         super().__init__(parent)
-        self._layers: List[Layer] = []
-        self._active_layer_index: int = 0
         self._width: int = 0
         self._height: int = 0
+        self.layer_stack: LayerStack = LayerStack(1, 1)
         self._filepath: Optional[str] = None
         self._is_modified: bool = False
         self._cached_composite: Optional[Image.Image] = None
-        self.history = HistoryManager(max_history=30, parent=self)
+        self.history = HistoryManager(max_history=max_history, parent=self)
         self.history.history_changed.connect(self._on_history_changed)
 
     # Properties
@@ -66,21 +66,37 @@ class Document(QObject):
 
     @property
     def layers(self) -> List[Layer]:
-        return self._layers
+        return self.layer_stack.layers
+
+    @property
+    def _layers(self) -> List[Layer]:
+        """Backward-compatibility alias pointing directly to authoritative LayerStack."""
+        return self.layer_stack.layers
+
+    @_layers.setter
+    def _layers(self, val: List[Layer]):
+        self.layer_stack._layers = val
 
     @property
     def active_layer_index(self) -> int:
-        return self._active_layer_index
+        return self.layer_stack.active_index
+
+    @property
+    def _active_layer_index(self) -> int:
+        """Backward-compatibility alias pointing directly to authoritative LayerStack."""
+        return self.layer_stack.active_index
+
+    @_active_layer_index.setter
+    def _active_layer_index(self, val: int):
+        self.layer_stack.set_active_index(val)
 
     @property
     def active_layer(self) -> Optional[Layer]:
-        if 0 <= self._active_layer_index < len(self._layers):
-            return self._layers[self._active_layer_index]
-        return None
+        return self.layer_stack.active_layer
 
     @property
     def has_image(self) -> bool:
-        return len(self._layers) > 0 and self._width > 0 and self._height > 0
+        return len(self.layer_stack) > 0 and self._width > 0 and self._height > 0
 
     def set_modified(self, val: bool):
         if self._is_modified != val:
@@ -99,7 +115,7 @@ class Document(QObject):
         if not self.has_image:
             return None
         if self._cached_composite is None:
-            self._cached_composite = compose_layers(self._layers, (self._width, self._height))
+            self._cached_composite = self.layer_stack.composite()
         return self._cached_composite
 
     # Document Lifetime
@@ -108,43 +124,50 @@ class Document(QObject):
         width: int = 1920,
         height: int = 1080,
         fill_color: Tuple[int, int, int, int] = (255, 255, 255, 255),
+        initial_image: Optional[Image.Image] = None,
     ) -> None:
-        """Create a fresh blank document."""
-        self._width = max(1, width)
-        self._height = max(1, height)
+        """Create a fresh blank document or initialize with a starting image."""
+        self._width = max(1, int(width))
+        self._height = max(1, int(height))
         self._filepath = None
-        base_img = Image.new("RGBA", (self._width, self._height), fill_color)
-        bg_layer = Layer(name="Background", image=base_img)
-        self._layers = [bg_layer]
-        self._active_layer_index = 0
+        self.layer_stack = LayerStack(self._width, self._height)
+        if initial_image is not None:
+            base_img = initial_image.copy()
+            if base_img.mode != "RGBA":
+                base_img = base_img.convert("RGBA")
+        else:
+            base_img = Image.new("RGBA", (self._width, self._height), fill_color)
+        self.layer_stack.add_layer(base_img, name="Background")
         self.history.clear()
         self.set_modified(False)
         self.invalidate_composite()
 
-    def load_file(self, filepath: str) -> bool:
+    def load_file(self, filepath: str, raise_on_error: bool = False) -> bool:
         """Load image file from disk into a fresh document state."""
         try:
-            # pillow-heif registration handles heic if available
             try:
                 import pillow_heif
                 pillow_heif.register_heif_opener()
             except ImportError:
                 pass
 
+            if not os.path.exists(filepath):
+                raise FileNotFoundError(f"Image file does not exist: {filepath}")
+
             img = Image.open(filepath)
-            # Ensure loaded fully into memory
             img.load()
 
             self._width, self._height = img.size
             self._filepath = os.path.abspath(filepath)
-            bg_layer = Layer(name="Background", image=img)
-            self._layers = [bg_layer]
-            self._active_layer_index = 0
+            self.layer_stack = LayerStack(self._width, self._height)
+            self.layer_stack.add_layer(img, name="Background")
             self.history.clear()
             self.set_modified(False)
             self.invalidate_composite()
             return True
         except Exception as e:
+            if raise_on_error:
+                raise
             print(f"[Parto Document Error] Failed to load {filepath}: {e}")
             return False
 
@@ -175,19 +198,23 @@ class Document(QObject):
         return {
             "width": self._width,
             "height": self._height,
-            "active_layer_index": self._active_layer_index,
-            "layers": [lay.clone() for lay in self._layers],
+            "layer_stack": self.layer_stack.clone(),
+            "active_layer_index": self.layer_stack.active_index,
         }
 
     def _restore_snapshot(self, snapshot: Dict[str, Any]) -> None:
         """Restore state from snapshot."""
         self._width = snapshot["width"]
         self._height = snapshot["height"]
-        self._active_layer_index = min(snapshot["active_layer_index"], len(snapshot["layers"]) - 1)
-        self._layers = [lay.clone() for lay in snapshot["layers"]]
+        if "layer_stack" in snapshot and isinstance(snapshot["layer_stack"], LayerStack):
+            self.layer_stack = snapshot["layer_stack"].clone()
+        elif "layers" in snapshot:
+            self.layer_stack = LayerStack(self._width, self._height)
+            self.layer_stack._layers = [lay.clone() for lay in snapshot["layers"]]
+            self.layer_stack.set_active_index(snapshot.get("active_layer_index", 0))
         self.set_modified(True)
         self.invalidate_composite()
-        self.layer_selection_changed.emit(self._active_layer_index)
+        self.layer_selection_changed.emit(self.layer_stack.active_index)
 
     def _record_operation(self, name: str, before_snap: Dict[str, Any]):
         after_snap = self._create_snapshot()
@@ -203,8 +230,7 @@ class Document(QObject):
 
     # Layer Management
     def set_active_layer_index(self, index: int) -> None:
-        if 0 <= index < len(self._layers):
-            self._active_layer_index = index
+        if self.layer_stack.set_active_index(index):
             self.layer_selection_changed.emit(index)
 
     def add_layer(
@@ -214,116 +240,104 @@ class Document(QObject):
     ) -> Layer:
         """Add new layer above current active layer."""
         snap = self._create_snapshot()
-        idx = self._active_layer_index + 1
-        num = len(self._layers) + 1
+        idx = self.layer_stack.active_index + 1
+        num = len(self.layer_stack) + 1
         layer_name = name or f"Layer {num}"
         img = image if image is not None else Image.new("RGBA", (self._width, self._height), (0, 0, 0, 0))
-        new_lay = Layer(name=layer_name, image=img)
-        self._layers.insert(idx, new_lay)
-        self._active_layer_index = idx
+        new_lay = self.layer_stack.insert_layer(idx, image_or_layer=img, name=layer_name)
         self._record_operation(f"Add {layer_name}", snap)
         self.invalidate_composite()
-        self.layer_selection_changed.emit(self._active_layer_index)
+        self.layer_selection_changed.emit(self.layer_stack.active_index)
         return new_lay
 
     def duplicate_active_layer(self) -> Optional[Layer]:
         """Duplicate current active layer."""
-        active = self.active_layer
-        if active is None:
+        if not self.has_image or self.layer_stack.active_index < 0:
             return None
         snap = self._create_snapshot()
-        idx = self._active_layer_index + 1
-        new_lay = active.duplicate()
-        self._layers.insert(idx, new_lay)
-        self._active_layer_index = idx
-        self._record_operation(f"Duplicate {active.name}", snap)
-        self.invalidate_composite()
-        self.layer_selection_changed.emit(self._active_layer_index)
-        return new_lay
+        dup = self.layer_stack.duplicate_layer(self.layer_stack.active_index)
+        if dup:
+            self._record_operation(f"Duplicate {dup.name}", snap)
+            self.invalidate_composite()
+            self.layer_selection_changed.emit(self.layer_stack.active_index)
+            return dup
+        return None
 
     def remove_active_layer(self) -> bool:
         """Remove active layer (must keep at least 1 layer)."""
-        if len(self._layers) <= 1:
+        if len(self.layer_stack) <= 1:
             return False
         snap = self._create_snapshot()
-        removed = self._layers.pop(self._active_layer_index)
-        self._active_layer_index = max(0, min(self._active_layer_index, len(self._layers) - 1))
-        self._record_operation(f"Delete {removed.name}", snap)
-        self.invalidate_composite()
-        self.layer_selection_changed.emit(self._active_layer_index)
-        return True
+        removed = self.layer_stack.remove_layer(self.layer_stack.active_index)
+        if removed:
+            self._record_operation(f"Delete {removed.name}", snap)
+            self.invalidate_composite()
+            self.layer_selection_changed.emit(self.layer_stack.active_index)
+            return True
+        return False
 
     def move_layer_up(self) -> bool:
-        if self._active_layer_index >= len(self._layers) - 1:
+        if self.layer_stack.active_index >= len(self.layer_stack) - 1:
             return False
         snap = self._create_snapshot()
-        i = self._active_layer_index
-        self._layers[i], self._layers[i + 1] = self._layers[i + 1], self._layers[i]
-        self._active_layer_index = i + 1
-        self._record_operation("Move Layer Up", snap)
-        self.invalidate_composite()
-        self.layer_selection_changed.emit(self._active_layer_index)
-        return True
+        if self.layer_stack.move_layer_up(self.layer_stack.active_index):
+            self._record_operation("Move Layer Up", snap)
+            self.invalidate_composite()
+            self.layer_selection_changed.emit(self.layer_stack.active_index)
+            return True
+        return False
 
     def move_layer_down(self) -> bool:
-        if self._active_layer_index <= 0:
+        if self.layer_stack.active_index <= 0:
             return False
         snap = self._create_snapshot()
-        i = self._active_layer_index
-        self._layers[i], self._layers[i - 1] = self._layers[i - 1], self._layers[i]
-        self._active_layer_index = i - 1
-        self._record_operation("Move Layer Down", snap)
-        self.invalidate_composite()
-        self.layer_selection_changed.emit(self._active_layer_index)
-        return True
+        if self.layer_stack.move_layer_down(self.layer_stack.active_index):
+            self._record_operation("Move Layer Down", snap)
+            self.invalidate_composite()
+            self.layer_selection_changed.emit(self.layer_stack.active_index)
+            return True
+        return False
 
     def merge_down(self) -> bool:
         """Merge active layer with the layer directly beneath it."""
-        if self._active_layer_index <= 0 or len(self._layers) < 2:
+        if self.layer_stack.active_index <= 0 or len(self.layer_stack) < 2:
             return False
         snap = self._create_snapshot()
-        top_idx = self._active_layer_index
-        bottom_idx = top_idx - 1
-
-        top_layer = self._layers[top_idx]
-        bottom_layer = self._layers[bottom_idx]
-
-        # Composite top onto bottom
-        merged = compose_layers([bottom_layer, top_layer], (self._width, self._height))
-        bottom_layer.image = merged
-        self._layers.pop(top_idx)
-        self._active_layer_index = bottom_idx
-
-        self._record_operation("Merge Down", snap)
-        self.invalidate_composite()
-        self.layer_selection_changed.emit(self._active_layer_index)
-        return True
+        merged = self.layer_stack.merge_down(self.layer_stack.active_index)
+        if merged:
+            self._record_operation("Merge Down", snap)
+            self.invalidate_composite()
+            self.layer_selection_changed.emit(self.layer_stack.active_index)
+            return True
+        return False
 
     def set_layer_visible(self, index: int, visible: bool) -> None:
-        if 0 <= index < len(self._layers):
+        if 0 <= index < len(self.layer_stack):
             snap = self._create_snapshot()
-            self._layers[index].visible = visible
+            self.layer_stack[index].visible = visible
             self._record_operation("Toggle Layer Visibility", snap)
             self.invalidate_composite()
 
     def set_layer_opacity(self, index: int, opacity: float, record_history: bool = True) -> None:
-        if 0 <= index < len(self._layers):
+        if 0 <= index < len(self.layer_stack):
             if record_history:
                 snap = self._create_snapshot()
-                self._layers[index].set_opacity(opacity)
+                self.layer_stack[index].set_opacity(opacity)
                 self._record_operation("Change Layer Opacity", snap)
             else:
-                self._layers[index].set_opacity(opacity)
+                self.layer_stack[index].set_opacity(opacity)
             self.invalidate_composite()
 
-    # Transformations (Operate on active layer or entire document)
+    # Transformations (Operate on all layers to maintain document size)
     def rotate_document(self, clockwise: bool = True) -> None:
         """Rotate entire document 90 degrees."""
         if not self.has_image:
             return
         snap = self._create_snapshot()
         self._width, self._height = self._height, self._width
-        for lay in self._layers:
+        self.layer_stack.width = self._width
+        self.layer_stack.height = self._height
+        for lay in self.layer_stack:
             lay.image = rotate_90(lay.image, clockwise=clockwise)
         desc = "Rotate Right (90° CW)" if clockwise else "Rotate Left (90° CCW)"
         self._record_operation(desc, snap)
@@ -334,7 +348,7 @@ class Document(QObject):
         if not self.has_image:
             return
         snap = self._create_snapshot()
-        for lay in self._layers:
+        for lay in self.layer_stack:
             lay.image = rotate_180(lay.image)
         self._record_operation("Rotate 180°", snap)
         self.invalidate_composite()
@@ -344,7 +358,7 @@ class Document(QObject):
         if not self.has_image:
             return
         snap = self._create_snapshot()
-        for lay in self._layers:
+        for lay in self.layer_stack:
             lay.image = flip_horizontal(lay.image)
         self._record_operation("Flip Horizontal", snap)
         self.invalidate_composite()
@@ -354,12 +368,12 @@ class Document(QObject):
         if not self.has_image:
             return
         snap = self._create_snapshot()
-        for lay in self._layers:
+        for lay in self.layer_stack:
             lay.image = flip_vertical(lay.image)
         self._record_operation("Flip Vertical", snap)
         self.invalidate_composite()
 
-    def resize_document(self, new_width: int, new_height: int) -> None:
+    def resize_document(self, new_width: int, new_height: int, resample: int = Image.Resampling.LANCZOS) -> None:
         """Resize entire document and all layers."""
         if not self.has_image:
             return
@@ -367,8 +381,10 @@ class Document(QObject):
         nw, nh = max(1, int(new_width)), max(1, int(new_height))
         self._width = nw
         self._height = nh
-        for lay in self._layers:
-            lay.image = resize_image(lay.image, nw, nh)
+        self.layer_stack.width = nw
+        self.layer_stack.height = nh
+        for lay in self.layer_stack:
+            lay.image = resize_image(lay.image, nw, nh, resample=resample)
         self._record_operation(f"Resize ({nw} × {nh})", snap)
         self.invalidate_composite()
 
@@ -383,8 +399,10 @@ class Document(QObject):
 
         self._width = new_w
         self._height = new_h
+        self.layer_stack.width = new_w
+        self.layer_stack.height = new_h
 
-        for lay in self._layers:
+        for lay in self.layer_stack:
             lay.image = crop_image(lay.image, rect)
             lay.offset_x = max(0, lay.offset_x - left)
             lay.offset_y = max(0, lay.offset_y - top)
@@ -425,8 +443,8 @@ class Document(QObject):
         if not self.has_image or not self.active_layer:
             return None
         preview_layers = []
-        for i, lay in enumerate(self._layers):
-            if i == self._active_layer_index and lay.visible:
+        for i, lay in enumerate(self.layer_stack):
+            if i == self.layer_stack.active_index and lay.visible:
                 adj_img = apply_color_adjustments(
                     lay.image,
                     brightness=brightness,
@@ -450,6 +468,21 @@ class Document(QObject):
         active.image = apply_filter(active.image, filter_name)
         self._record_operation(f"Filter ({filter_name.title()})", snap)
         self.invalidate_composite()
+
+    def get_filter_preview(self, filter_name: str) -> Optional[Image.Image]:
+        """Return preview composite with filter applied to active layer."""
+        if not self.has_image or not self.active_layer:
+            return None
+        preview_layers = []
+        for i, lay in enumerate(self.layer_stack):
+            if i == self.layer_stack.active_index and lay.visible:
+                filt_img = apply_filter(lay.image, filter_name)
+                preview_lay = lay.clone()
+                preview_lay.image = filt_img
+                preview_layers.append(preview_lay)
+            else:
+                preview_layers.append(lay)
+        return compose_layers(preview_layers, (self._width, self._height))
 
     def remove_background(self, tolerance: int = 28, feather_radius: int = 2) -> None:
         """
