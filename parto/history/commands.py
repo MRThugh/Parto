@@ -217,10 +217,28 @@ class MergeDownCommand(Command):
         self.replaced_layers = replaced_layers
 
     def undo(self) -> None:
-        pass
+        if hasattr(self.target, "_layers"):
+            if self.merged_layer in self.target._layers:
+                idx = self.target._layers.index(self.merged_layer)
+                self.target._layers[idx:idx + 1] = [lay.clone() for lay in self.replaced_layers]
+            elif 0 <= self.index < len(self.target._layers):
+                self.target._layers[self.index:self.index + 1] = [lay.clone() for lay in self.replaced_layers]
+        if hasattr(self.target, "invalidate_composite"):
+            self.target.invalidate_composite()
+        if hasattr(self.target, "layer_selection_changed") and hasattr(self.target, "_active_layer_index"):
+            self.target.layer_selection_changed.emit(self.target._active_layer_index)
 
     def redo(self) -> None:
-        pass
+        if hasattr(self.target, "_layers"):
+            for lay in self.replaced_layers:
+                if lay in self.target._layers:
+                    self.target._layers.remove(lay)
+            insert_idx = min(self.index, len(self.target._layers))
+            self.target._layers.insert(insert_idx, self.merged_layer)
+        if hasattr(self.target, "invalidate_composite"):
+            self.target.invalidate_composite()
+        if hasattr(self.target, "layer_selection_changed") and hasattr(self.target, "_active_layer_index"):
+            self.target.layer_selection_changed.emit(self.target._active_layer_index)
 
 
 class ApplyAdjustmentCommand(Command):
@@ -240,10 +258,14 @@ class ApplyAdjustmentCommand(Command):
     def undo(self) -> None:
         if self.layer and self.before_img:
             self.layer.image = self.before_img.copy()
+        if hasattr(self.target, "invalidate_composite"):
+            self.target.invalidate_composite()
 
     def redo(self) -> None:
         if self.layer and self.after_img:
             self.layer.image = self.after_img.copy()
+        if hasattr(self.target, "invalidate_composite"):
+            self.target.invalidate_composite()
 
 
 class ApplyFilterCommand(Command):
@@ -263,8 +285,12 @@ class ApplyFilterCommand(Command):
     def undo(self) -> None:
         if self.layer and self.before_img:
             self.layer.image = self.before_img.copy()
+        if hasattr(self.target, "invalidate_composite"):
+            self.target.invalidate_composite()
 
     def redo(self) -> None:
         if self.layer and self.after_img:
             self.layer.image = self.after_img.copy()
+        if hasattr(self.target, "invalidate_composite"):
+            self.target.invalidate_composite()
 

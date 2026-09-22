@@ -16,9 +16,10 @@ from PySide6.QtWidgets import (
     QLabel,
     QSlider,
     QSpinBox,
-    QPushButton,
+    QToolButton,
     QColorDialog,
     QFrame,
+    QSizePolicy,
 )
 from parto.themes.manager import get_theme_manager
 
@@ -49,19 +50,21 @@ class BrushBar(QWidget):
 
     def _init_ui(self):
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 5, 12, 5)
-        layout.setSpacing(8)
+        layout.setContentsMargins(10, 4, 10, 4)
+        layout.setSpacing(6)
 
         # Title
         title_label = QLabel("Brush:", self)
-        title_label.setStyleSheet("font-weight: 600; font-size: 12px;")
+        title_label.setStyleSheet("font-weight: 600; font-size: 11px;")
         layout.addWidget(title_label)
 
-        # Separator
-        sep1 = QFrame(self)
-        sep1.setFrameShape(QFrame.VLine)
-        sep1.setFrameShadow(QFrame.Sunken)
-        layout.addWidget(sep1)
+        def _make_separator():
+            sep = QFrame(self)
+            sep.setFrameShape(QFrame.VLine)
+            sep.setFrameShadow(QFrame.Sunken)
+            return sep
+
+        layout.addWidget(_make_separator())
 
         # 1. Size Control (1 - 200 px)
         lbl_size = QLabel("Size:", self)
@@ -71,25 +74,24 @@ class BrushBar(QWidget):
         self.slider_size = QSlider(Qt.Horizontal, self)
         self.slider_size.setRange(1, 200)
         self.slider_size.setValue(8)
-        self.slider_size.setFixedWidth(80)
+        self.slider_size.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.slider_size.setMinimumWidth(40)
+        self.slider_size.setMaximumWidth(120)
         layout.addWidget(self.slider_size)
 
         self.spin_size = QSpinBox(self)
         self.spin_size.setRange(1, 200)
         self.spin_size.setValue(8)
         self.spin_size.setSuffix(" px")
-        self.spin_size.setFixedWidth(65)
+        self.spin_size.setFixedWidth(72)
+        self.spin_size.setAlignment(Qt.AlignRight)
         layout.addWidget(self.spin_size)
 
         self.slider_size.valueChanged.connect(self.spin_size.setValue)
         self.spin_size.valueChanged.connect(self.slider_size.setValue)
         self.slider_size.valueChanged.connect(self._on_size_slider_changed)
 
-        # Separator
-        sep2 = QFrame(self)
-        sep2.setFrameShape(QFrame.VLine)
-        sep2.setFrameShadow(QFrame.Sunken)
-        layout.addWidget(sep2)
+        layout.addWidget(_make_separator())
 
         # 2. Opacity Control (1 - 100 %)
         lbl_op = QLabel("Opacity:", self)
@@ -99,25 +101,24 @@ class BrushBar(QWidget):
         self.slider_opacity = QSlider(Qt.Horizontal, self)
         self.slider_opacity.setRange(1, 100)
         self.slider_opacity.setValue(100)
-        self.slider_opacity.setFixedWidth(70)
+        self.slider_opacity.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.slider_opacity.setMinimumWidth(40)
+        self.slider_opacity.setMaximumWidth(120)
         layout.addWidget(self.slider_opacity)
 
         self.spin_opacity = QSpinBox(self)
         self.spin_opacity.setRange(1, 100)
         self.spin_opacity.setValue(100)
         self.spin_opacity.setSuffix(" %")
-        self.spin_opacity.setFixedWidth(60)
+        self.spin_opacity.setFixedWidth(72)
+        self.spin_opacity.setAlignment(Qt.AlignRight)
         layout.addWidget(self.spin_opacity)
 
         self.slider_opacity.valueChanged.connect(self.spin_opacity.setValue)
         self.spin_opacity.valueChanged.connect(self.slider_opacity.setValue)
         self.slider_opacity.valueChanged.connect(self._on_opacity_slider_changed)
 
-        # Separator
-        sep3 = QFrame(self)
-        sep3.setFrameShape(QFrame.VLine)
-        sep3.setFrameShadow(QFrame.Sunken)
-        layout.addWidget(sep3)
+        layout.addWidget(_make_separator())
 
         # 3. Hardness Control (0 - 100 %)
         lbl_hard = QLabel("Hardness:", self)
@@ -127,28 +128,27 @@ class BrushBar(QWidget):
         self.slider_hardness = QSlider(Qt.Horizontal, self)
         self.slider_hardness.setRange(0, 100)
         self.slider_hardness.setValue(80)
-        self.slider_hardness.setFixedWidth(70)
+        self.slider_hardness.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.slider_hardness.setMinimumWidth(40)
+        self.slider_hardness.setMaximumWidth(120)
         layout.addWidget(self.slider_hardness)
 
         self.spin_hardness = QSpinBox(self)
         self.spin_hardness.setRange(0, 100)
         self.spin_hardness.setValue(80)
         self.spin_hardness.setSuffix(" %")
-        self.spin_hardness.setFixedWidth(60)
+        self.spin_hardness.setFixedWidth(72)
+        self.spin_hardness.setAlignment(Qt.AlignRight)
         layout.addWidget(self.spin_hardness)
 
         self.slider_hardness.valueChanged.connect(self.spin_hardness.setValue)
         self.spin_hardness.valueChanged.connect(self.slider_hardness.setValue)
         self.slider_hardness.valueChanged.connect(self._on_hardness_slider_changed)
 
-        # Separator
-        sep4 = QFrame(self)
-        sep4.setFrameShape(QFrame.VLine)
-        sep4.setFrameShadow(QFrame.Sunken)
-        layout.addWidget(sep4)
+        layout.addWidget(_make_separator())
 
         # 4. Color Swatch & Picker
-        self.color_chip = QPushButton(self)
+        self.color_chip = QToolButton(self)
         self.color_chip.setFixedSize(22, 22)
         self.color_chip.setCursor(Qt.PointingHandCursor)
         self.color_chip.setToolTip("Click to select Brush Color")
@@ -166,7 +166,7 @@ class BrushBar(QWidget):
             ("#eab308", "Yellow"),
         ]
         for hex_col, name in quick_colors:
-            btn = QPushButton(self)
+            btn = QToolButton(self)
             btn.setFixedSize(14, 14)
             btn.setCursor(Qt.PointingHandCursor)
             btn.setToolTip(f"{name} ({hex_col})")
@@ -177,14 +177,16 @@ class BrushBar(QWidget):
             layout.addWidget(btn)
 
         # Swap Button (X)
-        self.swap_btn = QPushButton("⇄", self)
+        self.swap_btn = QToolButton(self)
+        self.swap_btn.setText("⇄")
         self.swap_btn.setFixedSize(22, 22)
         self.swap_btn.setToolTip("Swap Foreground / Background Color (X)")
         self.swap_btn.clicked.connect(self._on_swap_colors)
         layout.addWidget(self.swap_btn)
 
         # Reset Button (D)
-        self.reset_btn = QPushButton("D", self)
+        self.reset_btn = QToolButton(self)
+        self.reset_btn.setText("D")
         self.reset_btn.setFixedSize(22, 22)
         self.reset_btn.setToolTip("Reset to Default Black / White (D)")
         self.reset_btn.clicked.connect(self._on_reset_colors)
@@ -233,16 +235,34 @@ class BrushBar(QWidget):
         self._update_color_chip_style()
 
     def set_size(self, size: int):
-        clamped = max(1, min(200, size))
-        self.slider_size.setValue(clamped)
+        clamped = max(1, min(200, int(size)))
+        if self.slider_size.value() != clamped:
+            self.slider_size.blockSignals(True)
+            self.spin_size.blockSignals(True)
+            self.slider_size.setValue(clamped)
+            self.spin_size.setValue(clamped)
+            self.slider_size.blockSignals(False)
+            self.spin_size.blockSignals(False)
 
     def set_opacity(self, opacity: float):
-        pct = max(1, min(100, int(opacity * 100)))
-        self.slider_opacity.setValue(pct)
+        pct = max(1, min(100, int(round(float(opacity) * 100))))
+        if self.slider_opacity.value() != pct:
+            self.slider_opacity.blockSignals(True)
+            self.spin_opacity.blockSignals(True)
+            self.slider_opacity.setValue(pct)
+            self.spin_opacity.setValue(pct)
+            self.slider_opacity.blockSignals(False)
+            self.spin_opacity.blockSignals(False)
 
     def set_hardness(self, hardness: float):
-        pct = max(0, min(100, int(hardness * 100)))
-        self.slider_hardness.setValue(pct)
+        pct = max(0, min(100, int(round(float(hardness) * 100))))
+        if self.slider_hardness.value() != pct:
+            self.slider_hardness.blockSignals(True)
+            self.spin_hardness.blockSignals(True)
+            self.slider_hardness.setValue(pct)
+            self.spin_hardness.setValue(pct)
+            self.slider_hardness.blockSignals(False)
+            self.spin_hardness.blockSignals(False)
 
     def _update_color_chip_style(self):
         r, g, b, a = self._color

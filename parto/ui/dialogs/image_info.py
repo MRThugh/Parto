@@ -30,7 +30,8 @@ class ImageInfoDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Image Properties — Parto")
         self.setModal(True)
-        self.setFixedSize(480, 360)
+        self.setMinimumSize(480, 380)
+        self.resize(520, 420)
         self.metadata = metadata
 
         self._init_ui()

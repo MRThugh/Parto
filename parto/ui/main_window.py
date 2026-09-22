@@ -40,6 +40,7 @@ from .widgets.brush_bar import BrushBar
 from .widgets.toast import Toast
 from .panels.adjustments import AdjustmentDock
 from .panels.layers_panel import LayersDock
+from .dock_animator import DockAnimator
 from .statusbar import EditorStatusBar
 from .toolbar import EditorToolBar
 from .menus import EditorMenuBar
@@ -118,9 +119,9 @@ class MainWindow(QMainWindow):
         # Brush Bar (Hidden by default until Brush tool is active)
         self.brush_bar = BrushBar(self)
         self.brush_bar.hide()
-        self.brush_bar.size_changed.connect(lambda s: setattr(self.tool_brush, "size", s))
-        self.brush_bar.opacity_changed.connect(lambda o: setattr(self.tool_brush, "opacity", o))
-        self.brush_bar.hardness_changed.connect(lambda h: setattr(self.tool_brush, "hardness", h))
+        self.brush_bar.size_changed.connect(self.tool_brush.set_size)
+        self.brush_bar.opacity_changed.connect(self.tool_brush.set_opacity)
+        self.brush_bar.hardness_changed.connect(self.tool_brush.set_hardness)
         self.brush_bar.color_changed.connect(self.set_brush_color)
         self.central_layout.addWidget(self.brush_bar)
 
@@ -155,6 +156,22 @@ class MainWindow(QMainWindow):
         self.tabifyDockWidget(self.layers_dock, self.adjustments_dock)
         self.layers_dock.hide()
         self.adjustments_dock.hide()
+
+        # Smooth dock transitions
+        self.layers_animator = DockAnimator(self, self.layers_dock, target_width=280, duration_ms=200)
+        self.adjustments_animator = DockAnimator(self, self.adjustments_dock, target_width=280, duration_ms=200)
+
+    def toggle_layers_dock(self, animate: bool = True):
+        self.layers_animator.toggle(animate=animate)
+
+    def set_layers_dock_visible(self, visible: bool, animate: bool = True):
+        self.layers_animator.set_visible(visible, animate=animate)
+
+    def toggle_adjustments_dock(self, animate: bool = True):
+        self.adjustments_animator.toggle(animate=animate)
+
+    def set_adjustments_dock_visible(self, visible: bool, animate: bool = True):
+        self.adjustments_animator.set_visible(visible, animate=animate)
 
     def _init_toolbar(self):
         """Construct the top tool bar."""
@@ -425,6 +442,9 @@ class MainWindow(QMainWindow):
     def action_tool_brush(self):
         self.crop_bar.hide()
         self.brush_bar.show()
+        self.brush_bar.set_size(self.tool_brush.size)
+        self.brush_bar.set_opacity(self.tool_brush.opacity)
+        self.brush_bar.set_hardness(self.tool_brush.hardness)
         self.brush_bar.set_color(self.tool_brush.color)
         self.canvas.set_tool(self.tool_brush)
         self.tb_tool_brush.setChecked(True)
@@ -438,11 +458,11 @@ class MainWindow(QMainWindow):
         self.toast.show_message("Eyedropper active — Click pixel to sample color")
 
     def set_brush_color(self, rgba: Tuple[int, int, int, int]):
-        self.tool_brush.color = rgba
+        self.tool_brush.set_color(rgba)
         if hasattr(self, "brush_bar"):
             self.brush_bar.set_color(rgba)
         r, g, b, _ = rgba
-        self.toast.show_message(f"Sampled #{r:02X}{g:02X}{b:02X}")
+        self.toast.show_message(f"Brush color #{r:02X}{g:02X}{b:02X}")
 
     # Adjustments
     def _on_apply_adjustments(self, b: float, c: float, s: float, sh: float):
@@ -452,30 +472,9 @@ class MainWindow(QMainWindow):
     def _on_preview_adjustments(self, b: float, c: float, s: float, sh: float):
         if not self.document.has_image or not self.document.active_layer:
             return
-        from ..image.processing import (
-            adjust_brightness,
-            adjust_contrast,
-            adjust_saturation,
-            adjust_sharpness,
-        )
-        img = self.document.active_layer.image.copy()
-        if abs(b - 1.0) > 0.001:
-            img = adjust_brightness(img, b)
-        if abs(c - 1.0) > 0.001:
-            img = adjust_contrast(img, c)
-        if abs(s - 1.0) > 0.001:
-            img = adjust_saturation(img, s)
-        if abs(sh - 1.0) > 0.001:
-            img = adjust_sharpness(img, sh)
-
-        if len(self.document.layers) <= 1:
-            self.canvas.show_preview_image(img)
-        else:
-            orig = self.document.active_layer.image
-            self.document.active_layer.image = img
-            comp = self.document.get_composite()
-            self.document.active_layer.image = orig
-            self.canvas.show_preview_image(comp)
+        preview_comp = self.document.get_adjusted_preview(b, c, s, sh)
+        if preview_comp:
+            self.canvas.show_preview_image(preview_comp)
 
     def _on_reset_preview_adjustments(self):
         self.canvas.update_composite_pixmap()

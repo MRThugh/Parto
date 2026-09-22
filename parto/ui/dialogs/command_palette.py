@@ -32,7 +32,8 @@ class CommandPalette(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Command Palette — Parto")
         self.setModal(True)
-        self.setFixedSize(500, 320)
+        self.setMinimumSize(480, 300)
+        self.resize(540, 340)
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
 
         self.commands = commands

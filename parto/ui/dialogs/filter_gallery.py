@@ -33,7 +33,8 @@ class FilterDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Filter Gallery — Parto")
         self.setModal(True)
-        self.setFixedSize(540, 400)
+        self.setMinimumSize(540, 400)
+        self.resize(600, 440)
 
         # Generate a lightweight preview thumbnail
         thumb = source_image.copy()

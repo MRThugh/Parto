@@ -466,3 +466,329 @@ def test_background_removal_api_consistency():
     assert remove_background(None, tolerance=28, feather_radius=2) is None
 
 
+def test_snapshot_preserves_layer_names(qapp):
+    doc = Document()
+    doc.new_document(100, 100)
+    layer1 = doc.active_layer
+    layer1.name = "My Custom Layer"
+
+    # Take snapshot and restore
+    snap = doc._create_snapshot()
+    doc._restore_snapshot(snap)
+
+    # Layer name should remain strictly identical, NOT "My Custom Layer (Copy)"
+    assert doc.active_layer.name == "My Custom Layer"
+    assert doc.active_layer.id == layer1.id
+
+    # Do an operation with history and undo/redo
+    doc.add_layer("Foreground")
+    assert doc.active_layer.name == "Foreground"
+    doc.history.undo()
+    assert doc.active_layer.name == "My Custom Layer"
+    doc.history.redo()
+    assert doc.active_layer.name == "Foreground"
+
+
+def test_layer_duplicate_adds_copy_suffix_and_new_id():
+    doc = Document()
+    doc.new_document(100, 100)
+    orig_layer = doc.active_layer
+    orig_layer.name = "Background"
+    orig_id = orig_layer.id
+
+    dup_layer = doc.duplicate_active_layer()
+    assert dup_layer is not None
+    assert dup_layer.name == "Background (Copy)"
+    assert dup_layer.id != orig_id
+
+
+def test_merge_down_command_undo_redo():
+    from parto.history.commands import MergeDownCommand
+    doc = Document()
+    doc.new_document(100, 100)
+    l1 = doc.active_layer
+    l1.name = "Bottom"
+    l2 = doc.add_layer("Top")
+
+    assert len(doc.layers) == 2
+    merged_layer = Layer(name="Merged", image=Image.new("RGBA", (100, 100), (255, 0, 0, 255)))
+
+    cmd = MergeDownCommand(target=doc, index=0, merged_layer=merged_layer, replaced_layers=[l1, l2])
+    # Simulate redo
+    cmd.redo()
+    assert len(doc.layers) == 1
+    assert doc.layers[0] == merged_layer
+
+    # Simulate undo
+    cmd.undo()
+    assert len(doc.layers) == 2
+    assert doc.layers[0].name == "Bottom"
+    assert doc.layers[1].name == "Top"
+
+
+def test_brush_tool_dab_softness_and_opacity():
+    brush = BrushTool()
+    brush.set_size(16)
+    brush.set_hardness(0.5)
+    brush.set_opacity(0.8)
+    brush.set_color((255, 0, 0, 255))
+
+    dab = brush._get_brush_dab()
+    assert dab.size == (16, 16)
+    assert dab.mode == "RGBA"
+
+    # Center should be close to max alpha scaled by opacity (255 * 0.8 ~ 204)
+    center_alpha = dab.getpixel((8, 8))[3]
+    assert 180 <= center_alpha <= 204
+
+    # Edge pixel should have falloff alpha
+    edge_alpha = dab.getpixel((0, 8))[3]
+    assert edge_alpha < center_alpha
+
+
+def test_brush_tool_keyboard_events():
+    from PySide6.QtGui import QKeyEvent
+    from PySide6.QtCore import QEvent
+
+    brush = BrushTool()
+    brush.set_size(10)
+
+    # Bracket right increases size
+    event_right = QKeyEvent(QEvent.KeyPress, Qt.Key_BracketRight, Qt.NoModifier)
+    assert brush.key_press(event_right, None) is True
+    assert brush.size == 12
+
+    # Bracket left decreases size
+    event_left = QKeyEvent(QEvent.KeyPress, Qt.Key_BracketLeft, Qt.NoModifier)
+    assert brush.key_press(event_left, None) is True
+    assert brush.size == 10
+
+    # X swaps colors
+    brush.color = (10, 20, 30, 255)
+    brush.background_color = (40, 50, 60, 255)
+    event_x = QKeyEvent(QEvent.KeyPress, Qt.Key_X, Qt.NoModifier)
+    assert brush.key_press(event_x, None) is True
+    assert brush.color == (40, 50, 60, 255)
+    assert brush.background_color == (10, 20, 30, 255)
+
+    # D resets to default colors
+    event_d = QKeyEvent(QEvent.KeyPress, Qt.Key_D, Qt.NoModifier)
+    assert brush.key_press(event_d, None) is True
+    assert brush.color == (0, 0, 0, 255)
+    assert brush.background_color == (255, 255, 255, 255)
+
+
+def test_document_empty_and_single_layer_boundaries():
+    doc = Document()
+    doc.new_document(50, 50)
+
+    # Only 1 layer: remove should be disabled/return False
+    assert doc.remove_active_layer() is False
+    # Only 1 layer: merge down should fail safely
+    assert doc.merge_down() is False
+    # Move up/down on single layer should fail safely
+    assert doc.move_layer_up() is False
+    assert doc.move_layer_down() is False
+
+
+def test_dialogs_minimum_size_configuration(qapp):
+    from parto.ui.dialogs.resize import ResizeDialog
+    from parto.ui.dialogs.about import AboutDialog
+    from parto.ui.dialogs.shortcuts_dialog import ShortcutsDialog
+    from parto.ui.dialogs.image_info import ImageInfoDialog
+    from parto.ui.dialogs.filter_gallery import FilterDialog
+
+    resize_dlg = ResizeDialog(100, 100)
+    assert resize_dlg.minimumWidth() >= 400
+    assert resize_dlg.minimumHeight() >= 380
+
+    about_dlg = AboutDialog()
+    assert about_dlg.minimumWidth() >= 400
+    assert about_dlg.minimumHeight() >= 360
+
+    shortcuts_dlg = ShortcutsDialog()
+    assert shortcuts_dlg.minimumWidth() >= 500
+    assert shortcuts_dlg.minimumHeight() >= 380
+
+    info_dlg = ImageInfoDialog({"dimensions": "100x100"})
+    assert info_dlg.minimumWidth() >= 450
+    assert info_dlg.minimumHeight() >= 360
+
+    dummy_img = Image.new("RGBA", (100, 100), (100, 100, 100, 255))
+    filter_dlg = FilterDialog(dummy_img)
+    assert filter_dlg.minimumWidth() >= 500
+    assert filter_dlg.minimumHeight() >= 380
+
+
+def test_get_adjusted_preview_is_non_destructive():
+    doc = Document()
+    doc.new_document(100, 100)
+    orig_pixel = doc.active_layer.image.getpixel((50, 50))
+
+    preview = doc.get_adjusted_preview(brightness=1.5, contrast=1.2, saturation=1.1, sharpness=1.0)
+    assert preview is not None
+    assert preview.size == (100, 100)
+
+    # Original layer must remain untouched
+    after_pixel = doc.active_layer.image.getpixel((50, 50))
+    assert after_pixel == orig_pixel
+
+
+def test_brush_bar_responsive_layout(qapp):
+    from PySide6.QtWidgets import QSizePolicy, QToolButton
+    from parto.ui.widgets.brush_bar import BrushBar
+
+    bar = BrushBar()
+
+    # 1. Sliders must have expanding size policy to adapt gracefully to window resizing
+    assert bar.slider_size.sizePolicy().horizontalPolicy() == QSizePolicy.Expanding
+    assert bar.slider_opacity.sizePolicy().horizontalPolicy() == QSizePolicy.Expanding
+    assert bar.slider_hardness.sizePolicy().horizontalPolicy() == QSizePolicy.Expanding
+
+    # 2. Spinboxes must have sufficient width (>= 70) and proper suffix without clipping
+    assert bar.spin_size.width() >= 70 or bar.spin_size.minimumWidth() >= 70
+    assert bar.spin_size.suffix() == " px"
+    assert bar.spin_opacity.suffix() == " %"
+    assert bar.spin_hardness.suffix() == " %"
+
+    # 3. Actions and color controls should use compact QToolButton to prevent inflated size hints
+    assert isinstance(bar.swap_btn, QToolButton)
+    assert isinstance(bar.reset_btn, QToolButton)
+    assert isinstance(bar.color_chip, QToolButton)
+
+    # 4. Setters clamp properly without errors
+    bar.set_size(50)
+    assert bar.slider_size.value() == 50
+    assert bar.spin_size.value() == 50
+
+    bar.set_opacity(0.75)
+    assert bar.slider_opacity.value() == 75
+    assert bar.spin_opacity.value() == 75
+
+    bar.set_hardness(0.40)
+    assert bar.slider_hardness.value() == 40
+    assert bar.spin_hardness.value() == 40
+
+
+def test_brush_bar_brush_tool_integration(qapp):
+    from parto.ui.main_window import MainWindow
+
+    win = MainWindow()
+
+    # Verify signals update tool_brush via public API setters
+    win.brush_bar.size_changed.emit(25)
+    assert win.tool_brush.size == 25
+    assert win.tool_brush._cached_dab_key is None  # Cache properly invalidated
+
+    win.brush_bar.opacity_changed.emit(0.65)
+    assert abs(win.tool_brush.opacity - 0.65) < 0.01
+
+    win.brush_bar.hardness_changed.emit(0.35)
+    assert abs(win.tool_brush.hardness - 0.35) < 0.01
+
+    # Activating brush tool syncs brush_bar UI controls with current tool state
+    win.tool_brush.set_size(42)
+    win.tool_brush.set_opacity(0.85)
+    win.tool_brush.set_hardness(0.60)
+    win.action_tool_brush()
+
+    assert win.brush_bar.slider_size.value() == 42
+    assert win.brush_bar.slider_opacity.value() == 85
+    assert win.brush_bar.slider_hardness.value() == 60
+
+
+def test_dock_animator_lifecycle_and_safety(qapp):
+    from PySide6.QtWidgets import QMainWindow, QDockWidget, QWidget, QVBoxLayout, QTextEdit
+    from parto.ui.dock_animator import DockAnimator
+    import time
+
+    win = QMainWindow()
+    win.resize(800, 600)
+    center = QTextEdit("Center")
+    win.setCentralWidget(center)
+
+    dock1 = QDockWidget("Layers", win)
+    c1 = QWidget()
+    QVBoxLayout(c1).addWidget(QTextEdit("Content"))
+    dock1.setWidget(c1)
+    win.addDockWidget(Qt.RightDockWidgetArea, dock1)
+    dock1.hide()
+    win.show()
+    qapp.processEvents()
+
+    animator = DockAnimator(win, dock1, target_width=260, duration_ms=50)
+
+    # 1. Expand transition
+    animator.show_dock()
+    assert animator.target_visible is True
+    # Let animation complete
+    start = time.time()
+    while time.time() - start < 0.15:
+        qapp.processEvents()
+        time.sleep(0.01)
+
+    assert dock1.isVisible() is True
+    assert c1.maximumWidth() == 16777215  # Reset to unrestricted width
+
+    # 2. Collapse transition
+    animator.hide_dock()
+    assert animator.target_visible is False
+    start = time.time()
+    while time.time() - start < 0.15:
+        qapp.processEvents()
+        time.sleep(0.01)
+
+    assert dock1.isVisible() is False
+    assert c1.maximumWidth() == 16777215
+
+    # 3. Rapid toggling
+    animator.toggle()
+    qapp.processEvents()
+    time.sleep(0.01)
+    animator.toggle()
+    qapp.processEvents()
+    time.sleep(0.01)
+    animator.toggle()
+    start = time.time()
+    while time.time() - start < 0.15:
+        qapp.processEvents()
+        time.sleep(0.01)
+
+    assert c1.maximumWidth() == 16777215
+
+    # 4. Floating docks skip animation to avoid interfering with desktop window manager
+    dock1.setFloating(True)
+    animator.show_dock()
+    assert dock1.isVisible() is True
+    animator.hide_dock()
+    assert dock1.isVisible() is False
+
+
+def test_menu_layers_dock_action_sync(qapp):
+    from parto.ui.main_window import MainWindow
+    from parto.shortcuts.manager import get_shortcut_manager
+
+    win = MainWindow()
+    win.show()
+    qapp.processEvents()
+
+    sm = get_shortcut_manager()
+    act_layers = sm.get("view_layers")
+    assert act_layers is not None
+
+    # Initially hidden
+    assert act_layers.action.isChecked() == win.layers_dock.isVisible()
+
+    # Toggle visible
+    win.set_layers_dock_visible(True, animate=False)
+    qapp.processEvents()
+    assert act_layers.action.isChecked() is True
+
+    # Toggle hidden
+    win.set_layers_dock_visible(False, animate=False)
+    qapp.processEvents()
+    assert act_layers.action.isChecked() is False
+
+
+
+

@@ -25,7 +25,8 @@ class AboutDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("About Parto")
         self.setModal(True)
-        self.setFixedSize(440, 360)
+        self.setMinimumSize(440, 370)
+        self.resize(460, 390)
 
         self._init_ui()
 

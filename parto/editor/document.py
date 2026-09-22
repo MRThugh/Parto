@@ -233,7 +233,7 @@ class Document(QObject):
             return None
         snap = self._create_snapshot()
         idx = self._active_layer_index + 1
-        new_lay = active.clone()
+        new_lay = active.duplicate()
         self._layers.insert(idx, new_lay)
         self._active_layer_index = idx
         self._record_operation(f"Duplicate {active.name}", snap)

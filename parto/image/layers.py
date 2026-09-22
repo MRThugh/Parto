@@ -67,21 +67,22 @@ class Layer:
     def height(self) -> int:
         return self.image.height
 
-    def clone(self) -> Layer:
-        """Create a deep copy of this layer."""
+    def clone(self, preserve_id: bool = True, preserve_name: bool = True) -> Layer:
+        """Create a deep copy of this layer, preserving name and id by default for snapshots."""
         return Layer(
-            name=f"{self.name} (Copy)",
+            name=self.name if preserve_name else f"{self.name} (Copy)",
             image=self.image.copy(),
             visible=self.visible,
             opacity=self.opacity,
             blend_mode=self.blend_mode,
             offset_x=self.offset_x,
             offset_y=self.offset_y,
+            layer_id=self.id if preserve_id else None,
         )
 
     def duplicate(self) -> Layer:
-        """Alias for clone()."""
-        return self.clone()
+        """Create an intentional user-facing duplicate with a new ID and (Copy) name suffix."""
+        return self.clone(preserve_id=False, preserve_name=False)
 
     def set_opacity(self, value: float):
         self.opacity = max(0.0, min(1.0, float(value)))

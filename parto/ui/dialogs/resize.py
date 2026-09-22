@@ -29,7 +29,8 @@ class ResizeDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Resize Image — Parto")
         self.setModal(True)
-        self.setFixedSize(380, 360)
+        self.setMinimumSize(420, 390)
+        self.resize(440, 410)
 
         self.orig_w = max(1, current_width)
         self.orig_h = max(1, current_height)

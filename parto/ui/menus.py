@@ -103,15 +103,43 @@ class EditorMenuBar:
             act_tlayers = sm.register("view_layers", "Layers Panel", "View", "F7", "Toggle Layers Panel", view_menu.addAction("Layers Panel"))
             act_tlayers.action.setCheckable(True)
             act_tlayers.action.setChecked(window.layers_dock.isVisible())
-            act_tlayers.action.toggled.connect(window.layers_dock.setVisible)
-            window.layers_dock.visibilityChanged.connect(act_tlayers.action.setChecked)
+            if hasattr(window, "set_layers_dock_visible"):
+                act_tlayers.action.toggled.connect(lambda checked: window.set_layers_dock_visible(checked, animate=True))
+            else:
+                act_tlayers.action.toggled.connect(window.layers_dock.setVisible)
+
+            def _sync_layers_action(vis: bool):
+                try:
+                    action = act_tlayers.action
+                    if action is not None and action.isChecked() != vis:
+                        action.blockSignals(True)
+                        action.setChecked(vis)
+                        action.blockSignals(False)
+                except (RuntimeError, AttributeError):
+                    pass
+
+            window.layers_dock.visibilityChanged.connect(_sync_layers_action)
 
         if hasattr(window, "adjustments_dock"):
             act_tadj = sm.register("view_adjustments", "Adjustments Panel", "View", "F8", "Toggle Live Adjustments Panel", view_menu.addAction("Adjustments Panel"))
             act_tadj.action.setCheckable(True)
             act_tadj.action.setChecked(window.adjustments_dock.isVisible())
-            act_tadj.action.toggled.connect(window.adjustments_dock.setVisible)
-            window.adjustments_dock.visibilityChanged.connect(act_tadj.action.setChecked)
+            if hasattr(window, "set_adjustments_dock_visible"):
+                act_tadj.action.toggled.connect(lambda checked: window.set_adjustments_dock_visible(checked, animate=True))
+            else:
+                act_tadj.action.toggled.connect(window.adjustments_dock.setVisible)
+
+            def _sync_adj_action(vis: bool):
+                try:
+                    action = act_tadj.action
+                    if action is not None and action.isChecked() != vis:
+                        action.blockSignals(True)
+                        action.setChecked(vis)
+                        action.blockSignals(False)
+                except (RuntimeError, AttributeError):
+                    pass
+
+            window.adjustments_dock.visibilityChanged.connect(_sync_adj_action)
 
         # ==========================================
         # 4. IMAGE MENU

@@ -30,7 +30,8 @@ class ShortcutsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Keyboard Shortcuts — Parto")
         self.setModal(True)
-        self.setFixedSize(580, 460)
+        self.setMinimumSize(540, 400)
+        self.resize(620, 480)
 
         self._init_ui()
         self._populate_table("")
