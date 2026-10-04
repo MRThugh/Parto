@@ -1,7 +1,7 @@
 # parto/ui/dialogs/about.py
 """
-Parto v0.3.0 - About Dialog
-Author: Ali Kamrani (MRThugh)
+Parto - About Dialog
+Author & Maintainer: Ali Kamrani (علی کامرانی)
 """
 
 from __future__ import annotations
@@ -15,11 +15,12 @@ from PySide6.QtWidgets import (
     QPushButton,
     QWidget,
 )
+from parto import __version__, __author__
 from parto.resources.icons import get_parto_icon
 
 
 class AboutDialog(QDialog):
-    """About Parto v0.3.0 modal dialog."""
+    """About Parto modal dialog with dynamic version and maintainer metadata."""
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -44,7 +45,7 @@ class AboutDialog(QDialog):
         layout.addWidget(logo_label)
 
         # Title & Version
-        title_label = QLabel("Parto (پرتو) v0.3.0", self)
+        title_label = QLabel(f"Parto (پرتو) v{__version__}", self)
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet("font-size: 20px; font-weight: 700; margin-top: 4px;")
         layout.addWidget(title_label)
@@ -60,7 +61,7 @@ class AboutDialog(QDialog):
 
         # Author & Repo info
         author_label = QLabel(
-            "<b>Author:</b> Ali Kamrani (MRThugh)<br>"
+            f"<b>Author & Maintainer:</b> {__author__}<br>"
             "<b>License:</b> MIT Open Source<br>"
             "<b>Repository:</b> <a style='color: #0284c7;' href='https://github.com/MRThugh/Parto'>github.com/MRThugh/Parto</a>",
             self,

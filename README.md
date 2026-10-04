@@ -1,6 +1,6 @@
 # Parto (پرتو) — Lightweight Desktop Image Editor
 
-[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](https://github.com/MRThugh/Parto)
+[![Version](https://img.shields.io/badge/version-0.3.1-blue.svg)](https://github.com/MRThugh/Parto)
 [![Python](https://img.shields.io/badge/python-3.10+-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![PySide6](https://img.shields.io/badge/GUI-PySide6%20%2F%20Qt-41CD52.svg?logo=qt&logoColor=white)](https://pypi.org/project/PySide6/)
 [![Pillow](https://img.shields.io/badge/imaging-Pillow-blue.svg)](https://python-pillow.org/)

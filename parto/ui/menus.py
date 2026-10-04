@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QMenuBar, QMenu
 from ..themes.manager import get_theme_manager
 from ..themes.palettes import THEMES
 from ..shortcuts.manager import get_shortcut_manager
+from .. import __version__
 
 
 class EditorMenuBar:
@@ -266,5 +267,5 @@ class EditorMenuBar:
 
         help_menu.addSeparator()
 
-        act_about = sm.register("help_about", "About Parto", "App", "", "About Parto v0.3.0", help_menu.addAction("About Parto"))
+        act_about = sm.register("help_about", "About Parto", "App", "", f"About Parto v{__version__}", help_menu.addAction("About Parto"))
         act_about.action.triggered.connect(window.action_show_about)

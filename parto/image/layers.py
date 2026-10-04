@@ -11,6 +11,16 @@ from PIL import Image
 import numpy as np
 
 
+SUPPORTED_BLEND_MODES: Tuple[str, ...] = (
+    "normal",
+    "multiply",
+    "screen",
+    "overlay",
+    "darken",
+    "lighten",
+)
+
+
 class Layer:
     """
     A single image layer in a document.
@@ -137,6 +147,14 @@ def _blend_mode_composite(
         rr = np.where(br < 0.5, 2.0 * br * tr, 1.0 - 2.0 * (1.0 - br) * (1.0 - tr))
         rg = np.where(bg < 0.5, 2.0 * bg * tg, 1.0 - 2.0 * (1.0 - bg) * (1.0 - tg))
         rb = np.where(bb < 0.5, 2.0 * bb * tb, 1.0 - 2.0 * (1.0 - bb) * (1.0 - tb))
+    elif mode == "darken":
+        rr = np.minimum(br, tr)
+        rg = np.minimum(bg, tg)
+        rb = np.minimum(bb, tb)
+    elif mode == "lighten":
+        rr = np.maximum(br, tr)
+        rg = np.maximum(bg, tg)
+        rb = np.maximum(bb, tb)
     else:
         rr, rg, rb = tr, tg, tb
 
@@ -204,7 +222,7 @@ def compose_layers(
         pos = (lay.offset_x, lay.offset_y)
         b_mode = (lay.blend_mode or "normal").lower()
 
-        if b_mode in ("multiply", "screen", "overlay"):
+        if b_mode in ("multiply", "screen", "overlay", "darken", "lighten"):
             _blend_mode_composite(composite, adjusted_layer, pos, b_mode)
         else:
             composite.alpha_composite(adjusted_layer, dest=pos)

@@ -1,8 +1,7 @@
 # main.py
 """
 Parto - A fast, modern, and lightweight desktop image editor.
-Author: Ali Kamrani (MRThugh)
-Version: 0.3.0
+Author & Maintainer: Ali Kamrani (علی کامرانی)
 """
 
 import sys
@@ -10,6 +9,7 @@ import os
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon
 
+from parto import __version__
 from parto.ui.main_window import MainWindow
 from parto.resources.icons import get_parto_icon
 from parto.themes.manager import get_theme_manager
@@ -35,7 +35,7 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Parto")
     app.setApplicationDisplayName("Parto — پرتو")
-    app.setApplicationVersion("0.3.0")
+    app.setApplicationVersion(__version__)
     app.setOrganizationName("Parto")
 
     # Ensure application font has a valid point size

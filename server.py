@@ -12,6 +12,8 @@ import os
 import socketserver
 import sys
 
+from parto import __version__ as PARTO_VERSION, __author__ as PARTO_AUTHOR
+
 PORT = int(os.environ.get("PORT", 3000))
 HOST = "0.0.0.0"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -37,8 +39,8 @@ class SafePartoHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             payload = {
                 "status": "healthy",
                 "app": "Parto (پرتو)",
-                "author": "Ali Kamrani (علی کامرانی)",
-                "version": "0.3.1",
+                "author": PARTO_AUTHOR,
+                "version": PARTO_VERSION,
                 "python": sys.version.split()[0],
             }
             self.wfile.write(json.dumps(payload, indent=2).encode("utf-8"))
@@ -52,8 +54,8 @@ class SafePartoHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             payload = {
                 "name": "Parto (پرتو)",
                 "tagline": "Lightweight Desktop Image Editor",
-                "version": "0.3.1",
-                "author": "Ali Kamrani (علی کامرانی)",
+                "version": PARTO_VERSION,
+                "author": PARTO_AUTHOR,
                 "github": "https://github.com/MRThugh/Parto",
                 "features": [
                     "Authoritative Single-Document Architecture",
@@ -198,7 +200,8 @@ class SafePartoHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     </div>
 </body>
 </html>"""
-        self.wfile.write(html.encode("utf-8"))
+        rendered_html = html.replace("v0.3.1", f"v{PARTO_VERSION}").replace("Ali Kamrani (علی کامرانی)", PARTO_AUTHOR)
+        self.wfile.write(rendered_html.encode("utf-8"))
 
     def end_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
