@@ -21,18 +21,27 @@ class MoveTool(BaseTool):
         self._is_dragging: bool = False
         self._last_screen_pos: QPoint = QPoint()
 
+    def deactivate(self, canvas: Any) -> None:
+        """Safely terminate drag on deactivation."""
+        if self._is_dragging:
+            self._is_dragging = False
+            if hasattr(canvas, "setCursor"):
+                canvas.setCursor(self.cursor_shape)
+
     def mouse_press(self, event: QMouseEvent, scene_pos: QPointF, canvas: Any) -> bool:
         if event.button() in (Qt.LeftButton, Qt.MiddleButton):
             self._is_dragging = True
-            self._last_screen_pos = event.pos()
+            pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
+            self._last_screen_pos = pos
             canvas.setCursor(Qt.ClosedHandCursor)
             return True
         return False
 
     def mouse_move(self, event: QMouseEvent, scene_pos: QPointF, canvas: Any) -> bool:
         if self._is_dragging:
-            delta = event.pos() - self._last_screen_pos
-            self._last_screen_pos = event.pos()
+            pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
+            delta = pos - self._last_screen_pos
+            self._last_screen_pos = pos
             canvas.horizontalScrollBar().setValue(canvas.horizontalScrollBar().value() - delta.x())
             canvas.verticalScrollBar().setValue(canvas.verticalScrollBar().value() - delta.y())
             return True

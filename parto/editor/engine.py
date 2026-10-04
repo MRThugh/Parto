@@ -51,6 +51,12 @@ class EditorEngine:
     def current_image(self, img: Optional[Image.Image]):
         if img is not None:
             self.set_image(img)
+        else:
+            self._document.layer_stack.clear()
+            self._document._width = 0
+            self._document._height = 0
+            self._document.invalidate_composite()
+            self._original_image = None
 
     @property
     def original_image(self) -> Optional[Image.Image]:
@@ -62,7 +68,7 @@ class EditorEngine:
 
     def set_original_image(self, img: Optional[Image.Image]) -> None:
         """Set the baseline original image safely."""
-        self.original_image = img
+        self._original_image = img.copy() if img is not None else None
 
     @property
     def filepath(self) -> Optional[str]:
@@ -212,4 +218,3 @@ class EditorEngine:
 
     def apply_remove_background(self, tolerance: int = 28, feather_radius: int = 2):
         self.remove_background(tolerance=tolerance, feather_radius=feather_radius)
-

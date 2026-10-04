@@ -69,9 +69,10 @@ class Canvas(QGraphicsView):
         self._pixmap_item: Optional[QGraphicsPixmapItem] = None
         self._bg_rect_item: Optional[QGraphicsRectItem] = None
 
-        # Tools & State
+        # Tools & Interaction Ownership State
         self.default_tool = MoveTool()
         self.active_tool: BaseTool = self.default_tool
+        self._interaction_tool: Optional[BaseTool] = None
         self._zoom_factor: float = 1.0
         self._is_space_pressed: bool = False
 
@@ -128,7 +129,10 @@ class Canvas(QGraphicsView):
             self.set_tool(self.default_tool)
 
     def set_tool(self, tool: BaseTool) -> None:
-        """Switch current interactive tool."""
+        """Switch current interactive tool with clean interaction termination."""
+        if self._interaction_tool is not None:
+            self._interaction_tool.deactivate(self)
+            self._interaction_tool = None
         if self.active_tool:
             self.active_tool.deactivate(self)
         self.active_tool = tool
@@ -207,14 +211,13 @@ class Canvas(QGraphicsView):
         ih = self.document.height
 
         scale = min(vw / iw, vh / ih)
-        # Apply transformation
         self.resetTransform()
         self._zoom_factor = scale
         self.scale(scale, scale)
         self.centerOn(iw / 2.0, ih / 2.0)
         self.zoom_changed.emit(self._zoom_factor)
 
-    # Event Handling & Tool Dispatching
+    # Event Handling & Interaction Ownership Tool Dispatching
     def wheelEvent(self, event: QWheelEvent) -> None:
         delta = event.angleDelta().y()
         if delta == 0:
@@ -229,20 +232,24 @@ class Canvas(QGraphicsView):
         event.accept()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        scene_pos = self.mapToScene(event.pos())
+        pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
+        scene_pos = self.mapToScene(pos)
 
-        # Middle click pans view
+        # Middle click or Space+LeftClick pans view via default MoveTool
         if event.button() == Qt.MiddleButton or (event.button() == Qt.LeftButton and self._is_space_pressed):
+            self._interaction_tool = self.default_tool
             self.default_tool.mouse_press(event, scene_pos, self)
             return
 
         if self.active_tool and self.active_tool.mouse_press(event, scene_pos, self):
+            self._interaction_tool = self.active_tool
             return
 
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
-        scene_pos = self.mapToScene(event.pos())
+        pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
+        scene_pos = self.mapToScene(pos)
 
         # Pixel inspection
         if self.document.has_image:
@@ -261,15 +268,28 @@ class Canvas(QGraphicsView):
                     except (IndexError, ValueError):
                         pass
 
-        if self.active_tool and self.active_tool.mouse_move(event, scene_pos, self):
+        # Interaction tool receives moves if an interaction is active
+        if self._interaction_tool is not None:
+            if self._interaction_tool.mouse_move(event, scene_pos, self):
+                return
+        elif self.active_tool and self.active_tool.mouse_move(event, scene_pos, self):
             return
 
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        scene_pos = self.mapToScene(event.pos())
+        pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
+        scene_pos = self.mapToScene(pos)
+        # Interaction tool that began the gesture MUST receive the release event
+        if self._interaction_tool is not None:
+            tool = self._interaction_tool
+            self._interaction_tool = None
+            if tool.mouse_release(event, scene_pos, self):
+                return
+
         if self.active_tool and self.active_tool.mouse_release(event, scene_pos, self):
             return
+
         super().mouseReleaseEvent(event)
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
@@ -288,7 +308,7 @@ class Canvas(QGraphicsView):
     def keyReleaseEvent(self, event: QKeyEvent) -> None:
         if event.key() == Qt.Key_Space and not event.isAutoRepeat():
             self._is_space_pressed = False
-            if self.active_tool:
+            if self._interaction_tool is None and self.active_tool:
                 self.setCursor(self.active_tool.cursor_shape)
             event.accept()
             return
@@ -296,7 +316,7 @@ class Canvas(QGraphicsView):
         super().keyReleaseEvent(event)
 
     def drawForeground(self, painter: QPainter, rect: QRectF) -> None:
-        """Let active tool render custom overlays (e.g. crop lines/handles) in scene coordinates."""
+        """Let active tool render custom overlays in scene coordinates."""
         super().drawForeground(painter, rect)
         if self.active_tool:
             self.active_tool.paint_overlay(painter, self)

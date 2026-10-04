@@ -91,10 +91,9 @@ class BrushPreviewWidget(QWidget):
         painter.setPen(QPen(border_col, 1.0))
         painter.drawRoundedRect(rect, 4, 4)
 
-        # Scale brush size to preview bounds
+        # Scale brush size to preview bounds (up to 500px)
         max_preview_radius = (min(rect.width(), rect.height()) - 6) / 2.0
-        # Map 1-200px brush size to 2px - max_preview_radius
-        preview_radius = 2.0 + (min(200, self._size) / 200.0) * (max_preview_radius - 2.0)
+        preview_radius = 2.0 + (min(500, self._size) / 500.0) * (max_preview_radius - 2.0)
 
         cx = rect.center().x()
         cy = rect.center().y()
@@ -158,30 +157,29 @@ class ColorChipButton(QToolButton):
                         x, y,
                         min(check_size, rect.right() - x + 1),
                         min(check_size, rect.bottom() - y + 1),
-                        c1 if is_even else c2
+                        c1 if is_even else c2,
                     )
 
-        # Draw fill color with alpha
+        # Swatch fill
         r, g, b, a = self._rgba
-        fill_color = QColor(r, g, b, a)
-        painter.setBrush(QBrush(fill_color))
-        painter.setPen(QPen(QColor(self._border_color), 1.5))
-        painter.drawRoundedRect(rect, 4, 4)
+        painter.setBrush(QBrush(QColor(r, g, b, a)))
+        painter.setPen(QPen(QColor(self._border_color), 1.0))
+        painter.drawRoundedRect(rect, 3, 3)
         painter.end()
 
 
 class BrushBar(QWidget):
     """
-    Floating / docked context bar for the Brush Tool.
-
-    Logical Layout:
-    [ Color & Swatches | Swap / Reset ] | [ Preview & Size ] | [ Opacity & Hardness ]
+    Top toolbar widget displayed when BrushTool is active.
+    Controls size (1-500px), opacity (1-100%), hardness (0-100%),
+    foreground/background colors, quick swatches, and swap/reset actions.
     """
 
     size_changed = Signal(int)
     opacity_changed = Signal(float)
     hardness_changed = Signal(float)
     color_changed = Signal(tuple)
+    colors_changed = Signal(tuple, tuple)  # fg, bg
 
     QUICK_COLORS = [
         ("#000000", "Black"),
@@ -195,6 +193,8 @@ class BrushBar(QWidget):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setObjectName("BrushBar")
+        self.setFixedHeight(40)
+
         self._color: Tuple[int, int, int, int] = (0, 0, 0, 255)
         self._bg_color: Tuple[int, int, int, int] = (255, 255, 255, 255)
         self._swatch_buttons: List[QToolButton] = []
@@ -226,7 +226,7 @@ class BrushBar(QWidget):
 
         main_layout.addWidget(self._create_separator())
 
-        # Group 2: Primary Control - Size & Live Preview
+        # Group 2: Primary Control - Size & Live Preview (Range 1 - 500)
         self._init_size_group(main_layout)
 
         main_layout.addWidget(self._create_separator())
@@ -302,8 +302,9 @@ class BrushBar(QWidget):
         lbl.setStyleSheet("font-size: 11px; font-weight: 500;")
         size_layout.addWidget(lbl)
 
+        # Consistent range 1 to 500
         self.slider_size = QSlider(Qt.Horizontal, self)
-        self.slider_size.setRange(1, 200)
+        self.slider_size.setRange(1, 500)
         self.slider_size.setValue(8)
         self.slider_size.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.slider_size.setMinimumWidth(60)
@@ -312,7 +313,7 @@ class BrushBar(QWidget):
         size_layout.addWidget(self.slider_size)
 
         self.spin_size = QSpinBox(self)
-        self.spin_size.setRange(1, 200)
+        self.spin_size.setRange(1, 500)
         self.spin_size.setValue(8)
         self.spin_size.setSuffix(" px")
         self.spin_size.setFixedWidth(70)
@@ -443,6 +444,7 @@ class BrushBar(QWidget):
             rgba = (color.red(), color.green(), color.blue(), color.alpha())
             self.set_color(rgba)
             self.color_changed.emit(rgba)
+            self.colors_changed.emit(self._color, self._bg_color)
 
     def _set_color_from_hex(self, hex_str: str) -> None:
         color = QColor(hex_str)
@@ -450,12 +452,14 @@ class BrushBar(QWidget):
             rgba = (color.red(), color.green(), color.blue(), 255)
             self.set_color(rgba)
             self.color_changed.emit(rgba)
+            self.colors_changed.emit(self._color, self._bg_color)
 
     def _on_swap_colors(self) -> None:
         self._color, self._bg_color = self._bg_color, self._color
         self._update_color_chip()
         self._sync_preview()
         self.color_changed.emit(self._color)
+        self.colors_changed.emit(self._color, self._bg_color)
 
     def _on_reset_colors(self) -> None:
         self._color = (0, 0, 0, 255)
@@ -463,6 +467,7 @@ class BrushBar(QWidget):
         self._update_color_chip()
         self._sync_preview()
         self.color_changed.emit(self._color)
+        self.colors_changed.emit(self._color, self._bg_color)
 
     # --- Public Value Setters ---
 
@@ -471,8 +476,19 @@ class BrushBar(QWidget):
         self._update_color_chip()
         self._sync_preview()
 
+    def set_colors(
+        self,
+        fg_rgba: Tuple[int, int, int, int],
+        bg_rgba: Tuple[int, int, int, int],
+    ) -> None:
+        """Authoritatively set both foreground and background colors."""
+        self._color = fg_rgba
+        self._bg_color = bg_rgba
+        self._update_color_chip()
+        self._sync_preview()
+
     def set_size(self, size: int) -> None:
-        clamped = max(1, min(200, int(size)))
+        clamped = max(1, min(500, int(size)))
         if self.slider_size.value() != clamped:
             self.slider_size.blockSignals(True)
             self.spin_size.blockSignals(True)
@@ -511,7 +527,6 @@ class BrushBar(QWidget):
         border_col = pal.get("border", "#3f3f46")
         self.color_chip.set_rgba(self._color, border_color=border_col)
 
-        # Highlight matching swatch button if any
         current_hex = f"#{self._color[0]:02x}{self._color[1]:02x}{self._color[2]:02x}".lower()
         for btn in self._swatch_buttons:
             hex_prop = btn.property("hex_code")
@@ -521,42 +536,57 @@ class BrushBar(QWidget):
                 )
             elif hex_prop:
                 btn.setStyleSheet(
-                    f"background-color: {hex_prop}; border: 1px solid {pal.get('border', '#52525b')}; border-radius: 3px;"
+                    f"background-color: {hex_prop}; border: 1px solid {pal.get('border_subtle', '#3f3f46')}; border-radius: 3px;"
                 )
 
     def _apply_theme_styling(self) -> None:
         pal = get_theme_manager().get_palette()
-        border_subtle = pal.get("border_subtle", "#2e2e33")
-        surface = pal.get("surface", "#27272a")
+        bg = pal.get("surface", "#18181b")
+        border = pal.get("border_subtle", "#27272a")
         text = pal.get("text", "#f4f4f5")
-        btn_hover = pal.get("surface_raised", "#3f3f46")
+        text_muted = pal.get("text_muted", "#a1a1aa")
+        primary = pal.get("primary", "#0284c7")
+        sunken = pal.get("surface_sunken", "#09090b")
 
-        for sep in self._separators:
-            sep.setStyleSheet(f"background-color: {border_subtle};")
-
-        action_btn_style = f"""
+        self.setStyleSheet(f"""
+            QWidget#BrushBar {{
+                background-color: {bg};
+                border-bottom: 1px solid {border};
+            }}
+            QLabel {{
+                color: {text};
+            }}
+            QSpinBox {{
+                background-color: {sunken};
+                color: {text};
+                border: 1px solid {border};
+                border-radius: 4px;
+                padding: 2px 4px;
+                font-size: 11px;
+            }}
+            QSpinBox:focus {{
+                border: 1px solid {primary};
+            }}
             QToolButton {{
                 background-color: transparent;
-                color: {text};
-                border: 1px solid {border_subtle};
+                color: {text_muted};
+                border: 1px solid {border};
                 border-radius: 3px;
-                font-weight: bold;
-                font-size: 10px;
+                font-size: 11px;
+                font-weight: 600;
             }}
             QToolButton:hover {{
-                background-color: {btn_hover};
-                border-color: {pal.get('border', '#3f3f46')};
+                color: {text};
+                background-color: {sunken};
+                border: 1px solid {primary};
             }}
-            QToolButton:pressed {{
-                background-color: {pal.get('surface_sunken', '#141416')};
-            }}
-        """
-        self.swap_btn.setStyleSheet(action_btn_style)
-        self.reset_btn.setStyleSheet(action_btn_style)
+        """)
+
+        for sep in self._separators:
+            sep.setStyleSheet(f"background-color: {border};")
 
         self._update_color_chip()
         self._sync_preview()
 
     def _on_theme_changed(self, _: str) -> None:
         self._apply_theme_styling()
-        self.update()

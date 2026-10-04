@@ -7,6 +7,7 @@ Author: Ali Kamrani (MRThugh)
 
 from __future__ import annotations
 import os
+from enum import Enum
 from typing import Any, Optional, List, Tuple, Callable
 from PIL import Image
 from PySide6.QtCore import Qt, QPoint
@@ -50,6 +51,12 @@ from .dialogs.image_info import ImageInfoDialog
 from .dialogs.command_palette import CommandPalette
 from .dialogs.shortcuts_dialog import ShortcutsDialog
 from .dialogs.about import AboutDialog
+
+
+class SaveResult(Enum):
+    SUCCESS = "success"
+    CANCELLED = "cancelled"
+    FAILED = "failed"
 
 
 class MainWindow(QMainWindow):
@@ -123,6 +130,7 @@ class MainWindow(QMainWindow):
         self.brush_bar.opacity_changed.connect(self.tool_brush.set_opacity)
         self.brush_bar.hardness_changed.connect(self.tool_brush.set_hardness)
         self.brush_bar.color_changed.connect(self.set_brush_color)
+        self.brush_bar.colors_changed.connect(self._on_brush_colors_changed)
         self.central_layout.addWidget(self.brush_bar)
 
         # Stack: 0 -> Welcome Screen, 1 -> Canvas
@@ -164,89 +172,107 @@ class MainWindow(QMainWindow):
     def toggle_layers_dock(self, animate: bool = True):
         self.layers_animator.toggle(animate=animate)
 
-    def set_layers_dock_visible(self, visible: bool, animate: bool = True):
-        self.layers_animator.set_visible(visible, animate=animate)
-
     def toggle_adjustments_dock(self, animate: bool = True):
         self.adjustments_animator.toggle(animate=animate)
 
+    def set_layers_dock_visible(self, visible: bool, animate: bool = True):
+        self.layers_animator.set_visible(visible, animate=animate)
+        sm = get_shortcut_manager()
+        defn = sm.get("view_layers")
+        if defn and defn.action:
+            defn.action.setChecked(visible)
+
     def set_adjustments_dock_visible(self, visible: bool, animate: bool = True):
         self.adjustments_animator.set_visible(visible, animate=animate)
+        sm = get_shortcut_manager()
+        defn = sm.get("view_adjustments")
+        if defn and defn.action:
+            defn.action.setChecked(visible)
 
     def _init_toolbar(self):
-        """Construct the top tool bar."""
+        """Construct top toolbar with icons and quick actions."""
         self.toolbar = EditorToolBar(self)
         self.addToolBar(Qt.TopToolBarArea, self.toolbar)
 
         # File actions
-        act_new = self.toolbar.register_action("new", "New Canvas", "new")
-        act_new.triggered.connect(self.action_new_canvas)
-
-        act_open = self.toolbar.register_action("open", "Open Image", "open")
-        act_open.triggered.connect(self.action_open_image)
-
-        act_save = self.toolbar.register_action("save", "Save", "save")
-        act_save.triggered.connect(self.action_save_image)
-
+        self.toolbar.act_new = self.toolbar.register_action("new", "New Canvas", "new")
+        self.toolbar.act_open = self.toolbar.register_action("open", "Open Image", "open")
+        self.toolbar.act_save = self.toolbar.register_action("save", "Save Image", "save")
         self.toolbar.addSeparator()
 
-        # History actions
-        self.tb_act_undo = self.toolbar.register_action("undo", "Undo", "undo")
-        self.tb_act_undo.triggered.connect(self.action_undo)
-
-        self.tb_act_redo = self.toolbar.register_action("redo", "Redo", "redo")
-        self.tb_act_redo.triggered.connect(self.action_redo)
-
+        # Undo / Redo
+        self.toolbar.act_undo = self.toolbar.register_action("undo", "Undo", "undo")
+        self.toolbar.act_redo = self.toolbar.register_action("redo", "Redo", "redo")
         self.toolbar.addSeparator()
 
-        # Tools group
-        self.tb_tool_move = self.toolbar.register_action("move", "Pan / Move Tool (V)", "move", checkable=True, is_tool=True)
-        self.tb_tool_move.setChecked(True)
-        self.tb_tool_move.triggered.connect(self.action_tool_move)
-
-        self.tb_tool_crop = self.toolbar.register_action("crop", "Crop Tool (C)", "crop", checkable=True, is_tool=True)
-        self.tb_tool_crop.triggered.connect(self.action_tool_crop)
-
-        self.tb_tool_brush = self.toolbar.register_action("brush", "Brush Tool (B)", "brush", checkable=True, is_tool=True)
-        self.tb_tool_brush.triggered.connect(self.action_tool_brush)
-
-        self.tb_tool_eyedropper = self.toolbar.register_action("eyedropper", "Eyedropper (I)", "eyedropper", checkable=True, is_tool=True)
-        self.tb_tool_eyedropper.triggered.connect(self.action_tool_eyedropper)
-
+        # Tools (checkable)
+        self.toolbar.act_tool_move = self.toolbar.register_action("tool_move", "Move Tool (V)", "tool_move", checkable=True, is_tool=True)
+        self.toolbar.act_tool_crop = self.toolbar.register_action("tool_crop", "Crop Tool (C)", "tool_crop", checkable=True, is_tool=True)
+        self.toolbar.act_tool_brush = self.toolbar.register_action("tool_brush", "Brush Tool (B)", "tool_brush", checkable=True, is_tool=True)
+        self.toolbar.act_tool_eyedropper = self.toolbar.register_action("tool_eyedropper", "Eyedropper Tool (I)", "tool_eyedropper", checkable=True, is_tool=True)
+        self.toolbar.act_tool_move.setChecked(True)
         self.toolbar.addSeparator()
 
-        # Quick transforms
-        act_rcw = self.toolbar.register_action("rot_cw", "Rotate Right", "rotate-cw")
-        act_rcw.triggered.connect(lambda: self.document.rotate_document(True))
-
-        act_fliph = self.toolbar.register_action("flip_h", "Flip Horizontal", "flip-horizontal")
-        act_fliph.triggered.connect(self.document.flip_horizontal_document)
-
-        act_resize = self.toolbar.register_action("resize", "Resize Image", "resize")
-        act_resize.triggered.connect(self.action_resize_image)
-
+        # Zoom
+        self.toolbar.act_zoom_in = self.toolbar.register_action("zoom_in", "Zoom In", "zoom_in")
+        self.toolbar.act_zoom_out = self.toolbar.register_action("zoom_out", "Zoom Out", "zoom_out")
+        self.toolbar.act_zoom_fit = self.toolbar.register_action("zoom_fit", "Fit on Screen", "zoom_fit")
+        self.toolbar.act_zoom_actual = self.toolbar.register_action("zoom_actual", "Actual Pixels", "zoom_actual")
         self.toolbar.addSeparator()
 
-        # Zoom buttons
-        act_zin = self.toolbar.register_action("zoom_in", "Zoom In", "zoom-in")
-        act_zin.triggered.connect(self.canvas.zoom_in)
+        # Transforms
+        self.toolbar.act_rotate_left = self.toolbar.register_action("rot_left", "Rotate 90° CCW", "rot_left")
+        self.toolbar.act_rotate_right = self.toolbar.register_action("rot_right", "Rotate 90° CW", "rot_right")
+        self.toolbar.act_flip_h = self.toolbar.register_action("flip_h", "Flip Horizontal", "flip_h")
+        self.toolbar.act_flip_v = self.toolbar.register_action("flip_v", "Flip Vertical", "flip_v")
+        self.toolbar.addSeparator()
 
-        act_zout = self.toolbar.register_action("zoom_out", "Zoom Out", "zoom-out")
-        act_zout.triggered.connect(self.canvas.zoom_out)
+        # Docks
+        self.toolbar.act_layers_panel = self.toolbar.register_action("layers", "Layers Panel (F7)", "layers")
+        self.toolbar.act_adjustments_panel = self.toolbar.register_action("adjust", "Adjustments (F8)", "adjust")
 
-        act_zfit = self.toolbar.register_action("zoom_fit", "Fit Window", "zoom-fit")
-        act_zfit.triggered.connect(self.canvas.zoom_fit)
+        # Retain references for tests and tool switches
+        self.tb_tool_move = self.toolbar.act_tool_move
+        self.tb_tool_crop = self.toolbar.act_tool_crop
+        self.tb_tool_brush = self.toolbar.act_tool_brush
+        self.tb_tool_eyedropper = self.toolbar.act_tool_eyedropper
+        self.tb_act_undo = self.toolbar.act_undo
+        self.tb_act_redo = self.toolbar.act_redo
+
+        # Wire Toolbar Triggers
+        self.toolbar.act_tool_move.triggered.connect(self.action_tool_move)
+        self.toolbar.act_tool_crop.triggered.connect(self.action_tool_crop)
+        self.toolbar.act_tool_brush.triggered.connect(self.action_tool_brush)
+        self.toolbar.act_tool_eyedropper.triggered.connect(self.action_tool_eyedropper)
+
+        self.toolbar.act_new.triggered.connect(self.action_new_canvas)
+        self.toolbar.act_open.triggered.connect(self.action_open_image)
+        self.toolbar.act_save.triggered.connect(self.action_save_image)
+        self.toolbar.act_undo.triggered.connect(self.action_undo)
+        self.toolbar.act_redo.triggered.connect(self.action_redo)
+
+        self.toolbar.act_zoom_in.triggered.connect(self.canvas.zoom_in)
+        self.toolbar.act_zoom_out.triggered.connect(self.canvas.zoom_out)
+        self.toolbar.act_zoom_fit.triggered.connect(self.canvas.zoom_fit)
+        self.toolbar.act_zoom_actual.triggered.connect(self.canvas.zoom_actual)
+
+        self.toolbar.act_rotate_left.triggered.connect(lambda: self.document.rotate_document(clockwise=False))
+        self.toolbar.act_rotate_right.triggered.connect(lambda: self.document.rotate_document(clockwise=True))
+        self.toolbar.act_flip_h.triggered.connect(self.document.flip_horizontal_document)
+        self.toolbar.act_flip_v.triggered.connect(self.document.flip_vertical_document)
+
+        self.toolbar.act_layers_panel.triggered.connect(self.toggle_layers_dock)
+        self.toolbar.act_adjustments_panel.triggered.connect(self.toggle_adjustments_dock)
 
     def _init_statusbar(self):
-        """Construct the bottom telemetry status bar."""
+        """Construct bottom statusbar showing coordinates, RGB, and zoom."""
         self.statusbar = EditorStatusBar(self)
         self.setStatusBar(self.statusbar)
 
     def _init_menus(self):
-        """Construct application menus and bind shortcuts."""
+        """Build native-style menu bar with all operations and keyboard shortcuts."""
         EditorMenuBar.setup_menus(self.menuBar(), self)
 
-    # Document & State Handlers
     def _on_document_changed(self):
         if self.document.has_image:
             self.stack.setCurrentIndex(1)
@@ -295,13 +321,42 @@ class MainWindow(QMainWindow):
         self.statusbar.set_coordinates(x, y)
         self.statusbar.set_pixel_color(r, g, b, a)
 
-    # File Operations
+    # --- Unsaved Changes Safety & File Operations ---
+
+    def maybe_save_unsaved_changes(self) -> bool:
+        """
+        Safely prompts user about unsaved changes before New, Open, Close, or Exit.
+        Returns True if operation may proceed (changes saved or discarded, or no changes).
+        Returns False if operation should abort (user cancelled or save failed).
+        """
+        if not self.document.is_modified:
+            return True
+
+        ans = QMessageBox.question(
+            self,
+            "Unsaved Changes",
+            "Do you want to save changes before continuing?",
+            QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel,
+            QMessageBox.Save,
+        )
+        if ans == QMessageBox.Save:
+            result = self.action_save_image()
+            return result == SaveResult.SUCCESS
+        elif ans == QMessageBox.Discard:
+            return True
+        else:
+            return False
+
     def action_new_canvas(self):
+        if not self.maybe_save_unsaved_changes():
+            return
         self.document.new_document(1920, 1080)
         self.canvas.zoom_fit()
         self.toast.show_message("Created new 1920 × 1080 canvas")
 
     def action_open_image(self):
+        if not self.maybe_save_unsaved_changes():
+            return
         file_filter = (
             "Supported Images (*.png *.jpg *.jpeg *.webp *.bmp *.tif *.tiff *.heic);;"
             "PNG Files (*.png);;"
@@ -311,9 +366,11 @@ class MainWindow(QMainWindow):
         )
         path, _ = QFileDialog.getOpenFileName(self, "Open Image — Parto", "", file_filter)
         if path:
-            self.open_image_file(path)
+            self.open_image_file(path, check_unsaved=False)
 
-    def open_image_file(self, path: str):
+    def open_image_file(self, path: str, check_unsaved: bool = True):
+        if check_unsaved and not self.maybe_save_unsaved_changes():
+            return
         if not os.path.exists(path):
             QMessageBox.warning(self, "Error", f"File not found: {path}")
             return
@@ -347,18 +404,19 @@ class MainWindow(QMainWindow):
         """Compatibility method to cancel crop mode."""
         self.cancel_crop()
 
-    def action_save_image(self):
+    def action_save_image(self) -> SaveResult:
         if not self.document.filepath:
-            self.action_save_as()
-            return
+            return self.action_save_as()
 
         success, err = self.document.save_file()
         if success:
             self.toast.show_message(f"Saved {os.path.basename(self.document.filepath)}")
+            return SaveResult.SUCCESS
         else:
             QMessageBox.critical(self, "Save Error", f"Could not save file: {err}")
+            return SaveResult.FAILED
 
-    def action_save_as(self):
+    def action_save_as(self) -> SaveResult:
         file_filter = (
             "PNG Image (*.png);;"
             "JPEG Image (*.jpg *.jpeg);;"
@@ -372,8 +430,11 @@ class MainWindow(QMainWindow):
             success, err = self.document.save_file(path)
             if success:
                 self.toast.show_message(f"Saved as {os.path.basename(path)}")
+                return SaveResult.SUCCESS
             else:
                 QMessageBox.critical(self, "Save Error", f"Could not save file: {err}")
+                return SaveResult.FAILED
+        return SaveResult.CANCELLED
 
     def action_export_image(self):
         self.action_save_as()
@@ -403,7 +464,8 @@ class MainWindow(QMainWindow):
         dlg = ResizeDialog(self.document.width, self.document.height, self)
         if dlg.exec():
             nw, nh = dlg.get_dimensions()
-            self.document.resize_document(nw, nh)
+            resample = dlg.get_resample_filter()
+            self.document.resize_document(nw, nh, resample=resample)
             self.canvas.zoom_fit()
             self.toast.show_message(f"Resized image to {nw} × {nh} px")
 
@@ -443,7 +505,7 @@ class MainWindow(QMainWindow):
         self.brush_bar.set_size(self.tool_brush.size)
         self.brush_bar.set_opacity(self.tool_brush.opacity)
         self.brush_bar.set_hardness(self.tool_brush.hardness)
-        self.brush_bar.set_color(self.tool_brush.color)
+        self.brush_bar.set_colors(self.tool_brush.color, self.tool_brush.background_color)
         self.canvas.set_tool(self.tool_brush)
         self.tb_tool_brush.setChecked(True)
         self.toast.show_message("Brush Tool active — [ / ] resize, X swap, D reset")
@@ -455,10 +517,14 @@ class MainWindow(QMainWindow):
         self.tb_tool_eyedropper.setChecked(True)
         self.toast.show_message("Eyedropper active — Click pixel to sample color")
 
+    def _on_brush_colors_changed(self, fg: Tuple[int, int, int, int], bg: Tuple[int, int, int, int]):
+        self.tool_brush.color = fg
+        self.tool_brush.background_color = bg
+
     def set_brush_color(self, rgba: Tuple[int, int, int, int]):
         self.tool_brush.set_color(rgba)
         if hasattr(self, "brush_bar"):
-            self.brush_bar.set_color(rgba)
+            self.brush_bar.set_colors(self.tool_brush.color, self.tool_brush.background_color)
         r, g, b, _ = rgba
         self.toast.show_message(f"Brush color #{r:02X}{g:02X}{b:02X}")
 
@@ -475,7 +541,12 @@ class MainWindow(QMainWindow):
             self.canvas.show_preview_image(preview_comp)
 
     def _on_reset_preview_adjustments(self):
-        self.canvas.update_composite_pixmap()
+        """Display actual unadjusted composite when comparing original."""
+        comp = self.document.get_composite()
+        if comp:
+            self.canvas.show_preview_image(comp)
+        else:
+            self.canvas.update_composite_pixmap()
 
     # Filters
     def action_show_filter_gallery(self):
@@ -514,10 +585,6 @@ class MainWindow(QMainWindow):
             self.showFullScreen()
 
     def apply_remove_background(self, tolerance: int = 28, feather_radius: int = 2):
-        """
-        Remove background from active image using tolerance and edge feathering.
-        Applies to document and updates canvas/status.
-        """
         if hasattr(self, "document") and self.document.has_image:
             self.document.remove_background(tolerance=tolerance, feather_radius=feather_radius)
             self.canvas.update_composite_pixmap()
@@ -525,9 +592,7 @@ class MainWindow(QMainWindow):
             self.toast.show_message("Background removed")
 
     def remove_background(self, tolerance: int = 28, feather_radius: int = 2):
-        """Alias for apply_remove_background."""
         self.apply_remove_background(tolerance=tolerance, feather_radius=feather_radius)
-
 
     # Drag & Drop Support
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
@@ -543,20 +608,7 @@ class MainWindow(QMainWindow):
 
     # Window Closing Safeguard
     def closeEvent(self, event: QCloseEvent) -> None:
-        if self.document.is_modified:
-            ans = QMessageBox.question(
-                self,
-                "Unsaved Changes",
-                "Do you want to save changes before closing?",
-                QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel,
-                QMessageBox.Save,
-            )
-            if ans == QMessageBox.Save:
-                self.action_save_image()
-                event.accept()
-            elif ans == QMessageBox.Discard:
-                event.accept()
-            else:
-                event.ignore()
-        else:
+        if self.maybe_save_unsaved_changes():
             event.accept()
+        else:
+            event.ignore()

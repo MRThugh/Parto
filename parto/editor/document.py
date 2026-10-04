@@ -7,7 +7,7 @@ Author: Ali Kamrani (MRThugh)
 from __future__ import annotations
 import os
 from typing import List, Optional, Tuple, Dict, Any
-from PIL import Image
+from PIL import Image, ImageOps
 from PySide6.QtCore import QObject, Signal
 
 from ..image.layers import Layer, LayerStack, compose_layers
@@ -19,11 +19,49 @@ from ..image.transforms import (
     resize_image,
     crop_image,
 )
+from .geometry import (
+    transform_layer_crop,
+    transform_layer_resize,
+    transform_layer_rotate_90,
+    transform_layer_rotate_180,
+    transform_layer_flip_horizontal,
+    transform_layer_flip_vertical,
+)
 from ..image.processing import apply_color_adjustments, remove_background
 from ..image.filters import apply_filter
 from ..image.export import save_image_file
 from ..history.manager import HistoryManager
 from ..history.commands import SnapshotCommand
+
+
+def snapshots_equal(snap1: Dict[str, Any], snap2: Dict[str, Any]) -> bool:
+    """Compare two document snapshots to determine if any actual change occurred."""
+    if snap1["width"] != snap2["width"] or snap1["height"] != snap2["height"]:
+        return False
+    if snap1.get("active_layer_index") != snap2.get("active_layer_index"):
+        return False
+    stack1 = snap1.get("layer_stack")
+    stack2 = snap2.get("layer_stack")
+    if stack1 is None or stack2 is None:
+        return False
+    if len(stack1) != len(stack2):
+        return False
+    for l1, l2 in zip(stack1, stack2):
+        if l1.id != l2.id or l1.name != l2.name:
+            return False
+        if l1.visible != l2.visible:
+            return False
+        if abs(l1.opacity - l2.opacity) > 1e-4:
+            return False
+        if l1.blend_mode != l2.blend_mode:
+            return False
+        if l1.offset_x != l2.offset_x or l1.offset_y != l2.offset_y:
+            return False
+        if l1.image.size != l2.image.size:
+            return False
+        if l1.image.tobytes() != l2.image.tobytes():
+            return False
+    return True
 
 
 class Document(QObject):
@@ -157,7 +195,10 @@ class Document(QObject):
         self.invalidate_composite()
 
     def load_file(self, filepath: str, raise_on_error: bool = False) -> bool:
-        """Load image file from disk into a fresh document state."""
+        """
+        Load image file from disk into a fresh document state.
+        Uses safe file context handling and applies EXIF orientation normalization.
+        """
         try:
             try:
                 import pillow_heif
@@ -168,8 +209,15 @@ class Document(QObject):
             if not os.path.exists(filepath):
                 raise FileNotFoundError(f"Image file does not exist: {filepath}")
 
-            img = Image.open(filepath)
-            img.load()
+            with Image.open(filepath) as raw_img:
+                oriented = ImageOps.exif_transpose(raw_img)
+                if oriented is None:
+                    oriented = raw_img
+                # Load fully into memory as RGBA and copy so file handle is released
+                if oriented.mode != "RGBA":
+                    img = oriented.convert("RGBA")
+                else:
+                    img = oriented.copy()
 
             self._width, self._height = img.size
             self._filepath = os.path.abspath(filepath)
@@ -287,21 +335,35 @@ class Document(QObject):
 
     def add_layer(
         self,
+        arg1: Optional[Any] = None,
+        arg2: Optional[Any] = None,
         name: Optional[str] = None,
         image: Optional[Any] = None,
+        **kwargs,
     ) -> Layer:
         """Add new layer above current active layer."""
+        actual_image = image
+        actual_name = name
+
+        for arg in (arg1, arg2):
+            if isinstance(arg, (Image.Image, tuple, list)):
+                actual_image = arg
+            elif isinstance(arg, str):
+                actual_name = arg
+
         snap = self._create_snapshot()
         idx = self.layer_stack.active_index + 1
         num = len(self.layer_stack) + 1
-        layer_name = name or f"Layer {num}"
-        if isinstance(image, (tuple, list)):
-            img = Image.new("RGBA", (self._width, self._height), tuple(image))
-        elif isinstance(image, Image.Image):
-            img = image
+        layer_name = actual_name or f"Layer {num}"
+
+        if isinstance(actual_image, Image.Image):
+            img = actual_image
+        elif isinstance(actual_image, (tuple, list)):
+            img = Image.new("RGBA", (self._width, self._height), tuple(actual_image))
         else:
             img = Image.new("RGBA", (self._width, self._height), (0, 0, 0, 0))
-        new_lay = self.layer_stack.insert_layer(idx, image_or_layer=img, name=layer_name)
+
+        new_lay = self.layer_stack.insert_layer(idx, image_or_layer=img, name=layer_name, **kwargs)
         self._record_operation(f"Add {layer_name}", snap)
         self.invalidate_composite()
         self.layer_selection_changed.emit(self.layer_stack.active_index)
@@ -331,6 +393,25 @@ class Document(QObject):
             self.invalidate_composite()
             self.layer_selection_changed.emit(self.layer_stack.active_index)
             return True
+        return False
+
+    def remove_layer_by_id(self, layer_id: str, push_history: bool = True) -> bool:
+        """Remove layer by its unique ID (compatibility helper)."""
+        for i, lay in enumerate(self.layer_stack):
+            if lay.id == layer_id:
+                if push_history:
+                    snap = self._create_snapshot()
+                    removed = self.layer_stack.remove_layer(i)
+                    if removed:
+                        self._record_operation(f"Delete {removed.name}", snap)
+                        self.invalidate_composite()
+                        self.layer_selection_changed.emit(self.layer_stack.active_index)
+                        return True
+                else:
+                    self.layer_stack.remove_layer(i)
+                    self.invalidate_composite()
+                    self.layer_selection_changed.emit(self.layer_stack.active_index)
+                    return True
         return False
 
     def move_layer_up(self) -> bool:
@@ -390,70 +471,84 @@ class Document(QObject):
                 self.layer_stack[index].set_opacity(clamped)
             self.invalidate_composite()
 
-    # Transformations (Operate on all layers to maintain document size)
+    # Offset-Aware Geometric Transformations
     def rotate_document(self, clockwise: bool = True) -> None:
-        """Rotate entire document 90 degrees."""
+        """Rotate entire document 90 degrees with offset-aware layer transformation."""
         if not self.has_image:
             return
         snap = self._create_snapshot()
-        self._width, self._height = self._height, self._width
-        self.layer_stack.width = self._width
-        self.layer_stack.height = self._height
+        old_w, old_h = self._width, self._height
+        new_w, new_h = old_h, old_w
+
         for lay in self.layer_stack:
-            lay.image = rotate_90(lay.image, clockwise=clockwise)
+            transform_layer_rotate_90(lay, old_w, old_h, clockwise=clockwise)
+
+        self._width = new_w
+        self._height = new_h
+        self.layer_stack.width = new_w
+        self.layer_stack.height = new_h
+
         desc = "Rotate Right (90° CW)" if clockwise else "Rotate Left (90° CCW)"
         self._record_operation(desc, snap)
         self.invalidate_composite()
 
     def rotate_180_document(self) -> None:
-        """Rotate entire document 180 degrees."""
+        """Rotate entire document 180 degrees with offset-aware layer transformation."""
         if not self.has_image:
             return
         snap = self._create_snapshot()
         for lay in self.layer_stack:
-            lay.image = rotate_180(lay.image)
+            transform_layer_rotate_180(lay, self._width, self._height)
         self._record_operation("Rotate 180°", snap)
         self.invalidate_composite()
 
     def flip_horizontal_document(self) -> None:
-        """Flip document horizontally."""
+        """Flip document horizontally with offset-aware layer transformation."""
         if not self.has_image:
             return
         snap = self._create_snapshot()
         for lay in self.layer_stack:
-            lay.image = flip_horizontal(lay.image)
+            transform_layer_flip_horizontal(lay, self._width)
         self._record_operation("Flip Horizontal", snap)
         self.invalidate_composite()
 
     def flip_vertical_document(self) -> None:
-        """Flip document vertically."""
+        """Flip document vertically with offset-aware layer transformation."""
         if not self.has_image:
             return
         snap = self._create_snapshot()
         for lay in self.layer_stack:
-            lay.image = flip_vertical(lay.image)
+            transform_layer_flip_vertical(lay, self._height)
         self._record_operation("Flip Vertical", snap)
         self.invalidate_composite()
 
     def resize_document(self, new_width: int, new_height: int, resample: int = Image.Resampling.LANCZOS) -> None:
-        """Resize entire document and all layers."""
+        """Resize entire document and all layers with offset-aware scaling and specified resampling."""
         if not self.has_image:
             return
         nw, nh = max(1, int(new_width)), max(1, int(new_height))
         if nw == self._width and nh == self._height:
             return
         snap = self._create_snapshot()
+        old_size = (self._width, self._height)
+        new_size = (nw, nh)
+
+        for lay in self.layer_stack:
+            transform_layer_resize(lay, old_size, new_size, resample=resample)
+
         self._width = nw
         self._height = nh
         self.layer_stack.width = nw
         self.layer_stack.height = nh
-        for lay in self.layer_stack:
-            lay.image = resize_image(lay.image, nw, nh, resample=resample)
+
         self._record_operation(f"Resize ({nw} × {nh})", snap)
         self.invalidate_composite()
 
     def crop_document(self, rect: Tuple[int, int, int, int]) -> None:
-        """Crop entire document to rectangle (left, top, right, bottom)."""
+        """
+        Crop entire document to rectangle (left, top, right, bottom).
+        Accurately transforms Canvas-space crop rectangle into Layer-local coordinates for every layer.
+        """
         if not self.has_image:
             return
         left, top, right, bottom = rect
@@ -472,16 +567,15 @@ class Document(QObject):
             return  # Full canvas crop: no-op, no history
 
         snap = self._create_snapshot()
+        clamped_rect = (x1, y1, x2, y2)
+
+        for lay in self.layer_stack:
+            transform_layer_crop(lay, clamped_rect)
+
         self._width = new_w
         self._height = new_h
         self.layer_stack.width = new_w
         self.layer_stack.height = new_h
-
-        clamped_rect = (x1, y1, x2, y2)
-        for lay in self.layer_stack:
-            lay.image = crop_image(lay.image, clamped_rect)
-            lay.offset_x = max(0, lay.offset_x - x1)
-            lay.offset_y = max(0, lay.offset_y - y1)
 
         self._record_operation(f"Crop ({new_w} × {new_h})", snap)
         self.invalidate_composite()
@@ -591,4 +685,3 @@ class Document(QObject):
     def apply_remove_background(self, tolerance: int = 28, feather_radius: int = 2) -> None:
         """Consistent alias for remove_background."""
         self.remove_background(tolerance=tolerance, feather_radius=feather_radius)
-

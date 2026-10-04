@@ -90,6 +90,71 @@ class Layer:
         self.opacity = max(0.0, min(1.0, float(value)))
 
 
+def _blend_mode_composite(
+    base_img: Image.Image,
+    top_img: Image.Image,
+    pos: Tuple[int, int],
+    mode: str,
+) -> None:
+    """Apply non-normal blend modes (multiply, screen, overlay) over the overlapping region."""
+    bx, by = pos
+    bw, bh = base_img.size
+    tw, th = top_img.size
+
+    # Overlap rectangle in base coordinates
+    ix1 = max(0, bx)
+    iy1 = max(0, by)
+    ix2 = min(bw, bx + tw)
+    iy2 = min(bh, by + th)
+
+    if ix2 <= ix1 or iy2 <= iy1:
+        return
+
+    # Corresponding rectangle in top coordinates
+    tx1 = ix1 - bx
+    ty1 = iy1 - by
+    tx2 = ix2 - bx
+    ty2 = iy2 - by
+
+    base_crop = base_img.crop((ix1, iy1, ix2, iy2))
+    top_crop = top_img.crop((tx1, ty1, tx2, ty2))
+
+    base_arr = np.array(base_crop, dtype=np.float32) / 255.0
+    top_arr = np.array(top_crop, dtype=np.float32) / 255.0
+
+    br, bg, bb, ba = base_arr[:, :, 0], base_arr[:, :, 1], base_arr[:, :, 2], base_arr[:, :, 3]
+    tr, tg, tb, ta = top_arr[:, :, 0], top_arr[:, :, 1], top_arr[:, :, 2], top_arr[:, :, 3]
+
+    if mode == "multiply":
+        rr = br * tr
+        rg = bg * tg
+        rb = bb * tb
+    elif mode == "screen":
+        rr = 1.0 - (1.0 - br) * (1.0 - tr)
+        rg = 1.0 - (1.0 - bg) * (1.0 - tg)
+        rb = 1.0 - (1.0 - bb) * (1.0 - tb)
+    elif mode == "overlay":
+        rr = np.where(br < 0.5, 2.0 * br * tr, 1.0 - 2.0 * (1.0 - br) * (1.0 - tr))
+        rg = np.where(bg < 0.5, 2.0 * bg * tg, 1.0 - 2.0 * (1.0 - bg) * (1.0 - tg))
+        rb = np.where(bb < 0.5, 2.0 * bb * tb, 1.0 - 2.0 * (1.0 - bb) * (1.0 - tb))
+    else:
+        rr, rg, rb = tr, tg, tb
+
+    out_a = ta + ba * (1.0 - ta)
+    mask = out_a > 1e-5
+    out_r = np.zeros_like(rr)
+    out_g = np.zeros_like(rg)
+    out_b = np.zeros_like(rb)
+
+    out_r[mask] = (rr[mask] * ta[mask] + br[mask] * ba[mask] * (1.0 - ta[mask])) / out_a[mask]
+    out_g[mask] = (rg[mask] * ta[mask] + bg[mask] * ba[mask] * (1.0 - ta[mask])) / out_a[mask]
+    out_b[mask] = (rb[mask] * ta[mask] + bb[mask] * ba[mask] * (1.0 - ta[mask])) / out_a[mask]
+
+    out_arr = np.dstack([out_r, out_g, out_b, out_a])
+    blended_crop = Image.fromarray((np.clip(out_arr, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8), mode="RGBA")
+    base_img.paste(blended_crop, (ix1, iy1))
+
+
 def compose_layers(
     layers: List[Layer],
     canvas_size: Tuple[int, int],
@@ -98,6 +163,7 @@ def compose_layers(
     """
     Composite an ordered stack of layers into a single output image.
     Layers are processed from index 0 (bottom) to index N-1 (top).
+    Respects visibility, opacity, offset, and blend modes.
     """
     cw, ch = canvas_size
     if cw <= 0 or ch <= 0:
@@ -117,7 +183,6 @@ def compose_layers(
         # Adjust alpha by layer opacity if opacity < 1.0
         if lay.opacity < 0.999:
             r, g, b, a = layer_img.split()
-            # Fast alpha scaling with point LUT
             alpha_lut = [int(v * lay.opacity) for v in range(256)]
             a = a.point(alpha_lut)
             adjusted_layer = Image.merge("RGBA", (r, g, b, a))
@@ -125,7 +190,12 @@ def compose_layers(
             adjusted_layer = layer_img
 
         pos = (lay.offset_x, lay.offset_y)
-        composite.alpha_composite(adjusted_layer, dest=pos)
+        b_mode = (lay.blend_mode or "normal").lower()
+
+        if b_mode in ("multiply", "screen", "overlay"):
+            _blend_mode_composite(composite, adjusted_layer, pos, b_mode)
+        else:
+            composite.alpha_composite(adjusted_layer, dest=pos)
 
     return composite
 
@@ -179,26 +249,32 @@ class LayerStack:
         """Append a new or existing layer to the top of the stack and activate it."""
         if isinstance(image_or_layer, Layer):
             layer = image_or_layer
+            for k, v in kwargs.items():
+                if hasattr(layer, k):
+                    setattr(layer, k, v)
         else:
             img = image_or_layer
             if img is None:
                 img = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
-            layer = Layer(name=name, image=img)
+            layer = Layer(name=name, image=img, **kwargs)
         self._layers.append(layer)
         self._active_index = len(self._layers) - 1
         return layer
 
-    def insert_layer(self, index: int, image_or_layer: Any = None, name: str = "Layer") -> Layer:
-        """Insert a layer at the specified index."""
+    def insert_layer(self, index: int, image_or_layer: Any = None, name: str = "Layer", **kwargs) -> Layer:
+        """Insert a layer at the specified index and activate it."""
         if isinstance(image_or_layer, Layer):
             layer = image_or_layer
+            for k, v in kwargs.items():
+                if hasattr(layer, k):
+                    setattr(layer, k, v)
         else:
             img = image_or_layer
             if img is None:
                 img = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
             elif isinstance(img, (tuple, list)):
                 img = Image.new("RGBA", (self.width, self.height), tuple(img))
-            layer = Layer(name=name, image=img)
+            layer = Layer(name=name, image=img, **kwargs)
         target_idx = max(0, min(index, len(self._layers)))
         self._layers.insert(target_idx, layer)
         self._active_index = target_idx
@@ -215,52 +291,93 @@ class LayerStack:
         return None
 
     def remove_layer(self, index: int) -> Optional[Layer]:
-        """Remove layer at index and clamp active index."""
+        """Remove layer at index and maintain correct active layer selection."""
         if 0 <= index < len(self._layers):
             removed = self._layers.pop(index)
-            if self._active_index >= len(self._layers):
-                self._active_index = len(self._layers) - 1
+            if not self._layers:
+                self._active_index = -1
+            elif self._active_index > index:
+                self._active_index -= 1
+            elif self._active_index == index:
+                self._active_index = min(index, len(self._layers) - 1)
             return removed
         return None
+
+    def move_layer(self, from_idx: int, to_idx: int) -> bool:
+        """Move layer from from_idx to to_idx and update active index."""
+        if from_idx == to_idx and 0 <= from_idx < len(self._layers):
+            return True
+        if 0 <= from_idx < len(self._layers) and 0 <= to_idx < len(self._layers):
+            layer = self._layers.pop(from_idx)
+            self._layers.insert(to_idx, layer)
+            if self._active_index == from_idx:
+                self._active_index = to_idx
+            elif from_idx < self._active_index <= to_idx:
+                self._active_index -= 1
+            elif to_idx <= self._active_index < from_idx:
+                self._active_index += 1
+            return True
+        return False
 
     def move_layer_down(self, index: int) -> bool:
         """Move layer downward (towards bottom/background)."""
         if 0 < index < len(self._layers):
-            self._layers[index], self._layers[index - 1] = self._layers[index - 1], self._layers[index]
-            if self._active_index == index:
-                self._active_index = index - 1
-            elif self._active_index == index - 1:
-                self._active_index = index
-            return True
+            return self.move_layer(index, index - 1)
         return False
 
     def move_layer_up(self, index: int) -> bool:
         """Move layer upward (towards top of stack)."""
         if 0 <= index < len(self._layers) - 1:
-            self._layers[index], self._layers[index + 1] = self._layers[index + 1], self._layers[index]
-            if self._active_index == index:
-                self._active_index = index + 1
-            elif self._active_index == index + 1:
-                self._active_index = index
-            return True
+            return self.move_layer(index, index + 1)
         return False
 
     def merge_down(self, index: int) -> Optional[Layer]:
-        """Merge layer at index into the layer beneath it."""
+        """
+        Merge layer at index into the layer beneath it preserving visibility semantics.
+        If the upper layer is hidden, it does NOT contribute pixels to the visible result.
+        If both layers are hidden, the merged layer remains hidden.
+        """
         if index <= 0 or index >= len(self._layers):
             return None
         lower = self._layers[index - 1]
         upper = self._layers[index]
-        temp_lower = lower.clone()
-        temp_lower.visible = True
-        temp_upper = upper.clone()
-        temp_upper.visible = True
-        comp = compose_layers([temp_lower, temp_upper], (self.width, self.height))
-        lower.image = comp
-        lower.offset_x = 0
-        lower.offset_y = 0
-        lower.opacity = 1.0
-        lower.visible = True
+
+        if lower.visible and upper.visible:
+            comp = compose_layers([lower, upper], (self.width, self.height))
+            lower.image = comp
+            lower.offset_x = 0
+            lower.offset_y = 0
+            lower.opacity = 1.0
+            lower.visible = True
+        elif lower.visible and not upper.visible:
+            # Upper hidden: contributes nothing to visible pixels
+            comp = compose_layers([lower], (self.width, self.height))
+            lower.image = comp
+            lower.offset_x = 0
+            lower.offset_y = 0
+            lower.opacity = 1.0
+            lower.visible = True
+        elif not lower.visible and upper.visible:
+            # Lower hidden: contributes nothing to visible pixels
+            comp = compose_layers([upper], (self.width, self.height))
+            lower.image = comp
+            lower.offset_x = 0
+            lower.offset_y = 0
+            lower.opacity = 1.0
+            lower.visible = True
+        else:
+            # Both hidden: composite them for internal buffer, remain hidden
+            temp_lower = lower.clone()
+            temp_lower.visible = True
+            temp_upper = upper.clone()
+            temp_upper.visible = True
+            comp = compose_layers([temp_lower, temp_upper], (self.width, self.height))
+            lower.image = comp
+            lower.offset_x = 0
+            lower.offset_y = 0
+            lower.opacity = 1.0
+            lower.visible = False
+
         self._layers.pop(index)
         self._active_index = index - 1
         return lower
@@ -280,4 +397,3 @@ class LayerStack:
     def composite(self) -> Image.Image:
         """Render composite image of all visible layers."""
         return compose_layers(self._layers, (self.width, self.height))
-

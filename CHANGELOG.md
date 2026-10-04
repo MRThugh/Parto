@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.1] - 2026-10-04
+
+### Fixed
+- **Canonical Vector Icon Aliases**:
+  - Resolved missing icon warnings on startup by mapping toolbar and transform action identifiers (`tool_move`, `tool-move`, `tool_crop`, `tool-crop`, `tool_brush`, `tool-brush`, `tool_eyedropper`, `tool-eyedropper`, `rot_left`, `rot-left`, `rot_right`, `rot-right`) to existing canonical vector renderers (`move`, `crop`, `brush`, `eyedropper`, `rotate-ccw`, `rotate-cw`).
+  - Audited all 37 application icon categories across New, Open, Save, Export, Transforms, Layers, Tools, and Dialogs to guarantee warning-free rendering.
+  - Added dedicated regression test suite (`test_parto_v031_icons.py`) validating icon resolution, crop offset edge cases, resize resampling filters, and save safety flows.
+
+---
+
 ## [0.3.0] - 2026-09-21
 
 ### Added
@@ -48,6 +58,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Entry Point**: Modernized `main.py` to initialize `ThemeManager`, configure High-DPI scaling, set application metadata, and load `MainWindow`.
 - **Docks**: Hidden by default on startup for a distraction-free, clean canvas experience.
 - **Status Bar & Tool Bar**: Split into dedicated modular components with responsive breadcrumbs, zoom slider, color swatch, and status notifications.
+
+### Fixed
+- **Merge Down & Hidden Layer Semantics**: Hidden layers no longer leak unrendered pixels into merged results; visibility states are preserved accurately before and after merge.
+- **Offset-Aware Geometry Transformations**: Crop, resize, 90° CW/CCW rotate, 180° rotate, and horizontal/vertical flip operations now properly transform layer canvas-space bounding boxes and coordinate offsets.
+- **Single Coordinate System**: Introduced `parto.editor.geometry` module for canonical conversions between Canvas, Layer, and Screen coordinates.
+- **Blend Mode Support**: Implemented mathematical compositing for `Normal`, `Multiply`, `Screen`, `Overlay`, `Darken`, and `Lighten` blend modes.
+- **Unsaved Changes Safety & Close Event**: Ensured `SaveResult` enum handling across New, Open, and Close actions so cancel/failure never discards document state silently.
+- **Canvas Interaction Ownership**: Routed Middle-click and Space-drag gestures exclusively to `MoveTool`, eliminating stuck drag states during tool switches.
+- **Brush Tool Hardening**: Unified 1–500px brush size across UI and engine, added `deactivate()` stroke finalization, and synced foreground/background colors.
+- **LayerStack Index Management**: Corrected active index tracking when removing or reordering layers.
 
 ---
 

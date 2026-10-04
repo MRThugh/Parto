@@ -30,7 +30,8 @@ class Command(ABC):
 class SnapshotCommand(Command):
     """
     Command that records complete state before and after an operation
-    (e.g., transformations, filters, crops, adjustments).
+    (e.g., transformations, filters, crops, adjustments, layer stack changes).
+    Authoritative undo/redo mechanism in Parto v0.3.
     """
 
     def __init__(
@@ -54,36 +55,60 @@ class SnapshotCommand(Command):
         self.restore_fn(self.after_state)
 
 
+# --- Backward-Compatibility Command Classes ---
+
 class LayerAddCommand(Command):
-    """Command for adding a layer."""
+    """Backward-compatible command for adding a layer."""
 
     def __init__(self, document: Any, layer: Any, index: int = -1):
-        super().__init__(f"Add {layer.name}")
+        super().__init__(f"Add {getattr(layer, 'name', 'Layer')}")
         self.document = document
         self.layer = layer
         self.index = index
 
     def undo(self) -> None:
-        self.document.remove_layer_by_id(self.layer.id, push_history=False)
+        if hasattr(self.document, "remove_layer_by_id"):
+            self.document.remove_layer_by_id(self.layer.id, push_history=False)
+        elif hasattr(self.document, "layer_stack"):
+            layers = self.document.layer_stack.layers
+            if self.layer in layers:
+                self.document.layer_stack.remove_layer(layers.index(self.layer))
+                self.document.invalidate_composite()
 
     def redo(self) -> None:
-        self.document.add_layer(self.layer, self.index, push_history=False)
+        if hasattr(self.document, "insert_layer"):
+            idx = self.index if self.index >= 0 else len(self.document.layers)
+            self.document.insert_layer(idx, self.layer, push_history=False)
+        elif hasattr(self.document, "layer_stack"):
+            idx = self.index if self.index >= 0 else len(self.document.layer_stack)
+            self.document.layer_stack.insert_layer(idx, self.layer)
+            self.document.invalidate_composite()
 
 
 class LayerDeleteCommand(Command):
-    """Command for deleting a layer."""
+    """Backward-compatible command for deleting a layer."""
 
     def __init__(self, document: Any, layer: Any, index: int):
-        super().__init__(f"Delete {layer.name}")
+        super().__init__(f"Delete {getattr(layer, 'name', 'Layer')}")
         self.document = document
         self.layer = layer
         self.index = index
 
     def undo(self) -> None:
-        self.document.insert_layer(self.index, self.layer, push_history=False)
+        if hasattr(self.document, "insert_layer"):
+            self.document.insert_layer(self.index, self.layer, push_history=False)
+        elif hasattr(self.document, "layer_stack"):
+            self.document.layer_stack.insert_layer(self.index, self.layer)
+            self.document.invalidate_composite()
 
     def redo(self) -> None:
-        self.document.remove_layer_by_id(self.layer.id, push_history=False)
+        if hasattr(self.document, "remove_layer_by_id"):
+            self.document.remove_layer_by_id(self.layer.id, push_history=False)
+        elif hasattr(self.document, "layer_stack"):
+            layers = self.document.layer_stack.layers
+            if self.layer in layers:
+                self.document.layer_stack.remove_layer(layers.index(self.layer))
+                self.document.invalidate_composite()
 
 
 class LayerPropertyCommand(Command):
@@ -106,11 +131,13 @@ class LayerPropertyCommand(Command):
 
     def undo(self) -> None:
         setattr(self.layer, self.prop_name, self.old_val)
-        self.document.invalidate_composite()
+        if hasattr(self.document, "invalidate_composite"):
+            self.document.invalidate_composite()
 
     def redo(self) -> None:
         setattr(self.layer, self.prop_name, self.new_val)
-        self.document.invalidate_composite()
+        if hasattr(self.document, "invalidate_composite"):
+            self.document.invalidate_composite()
 
 
 class LayerReorderCommand(Command):
@@ -122,14 +149,25 @@ class LayerReorderCommand(Command):
         self.old_order = old_order
         self.new_order = new_order
 
+    def _apply_order(self, order_ids: List[str]) -> None:
+        if hasattr(self.document, "layer_stack"):
+            id_map = {lay.id: lay for lay in self.document.layer_stack.layers}
+            new_layers = [id_map[lid] for lid in order_ids if lid in id_map]
+            for lay in self.document.layer_stack.layers:
+                if lay.id not in order_ids:
+                    new_layers.append(lay)
+            self.document.layer_stack._layers = new_layers
+            if hasattr(self.document, "invalidate_composite"):
+                self.document.invalidate_composite()
+
     def undo(self) -> None:
-        self.document.reorder_layers_by_ids(self.old_order, push_history=False)
+        self._apply_order(self.old_order)
 
     def redo(self) -> None:
-        self.document.reorder_layers_by_ids(self.new_order, push_history=False)
+        self._apply_order(self.new_order)
 
 
-# Domain-specific commands for layers and operations
+# Domain-specific commands tested directly in test suite
 class AddLayerCommand(Command):
     def __init__(self, target: Any, layer: Any):
         super().__init__(f"Add {getattr(layer, 'name', 'Layer')}")
@@ -141,6 +179,8 @@ class AddLayerCommand(Command):
             self.target.remove_layer_by_id(self.layer.id, push_history=False)
         elif hasattr(self.target, "_layers") and self.layer in self.target._layers:
             self.target._layers.remove(self.layer)
+        elif hasattr(self.target, "layers") and self.layer in self.target.layers:
+            self.target.layers.remove(self.layer)
 
     def redo(self) -> None:
         if hasattr(self.target, "add_layer"):
@@ -161,7 +201,10 @@ class RemoveLayerCommand(Command):
 
     def undo(self) -> None:
         if hasattr(self.target, "insert_layer"):
-            self.target.insert_layer(self.index, self.layer, push_history=False)
+            try:
+                self.target.insert_layer(self.index, self.layer, push_history=False)
+            except TypeError:
+                self.target.insert_layer(self.index, self.layer)
         elif hasattr(self.target, "_layers"):
             self.target._layers.insert(self.index, self.layer)
 
@@ -182,10 +225,17 @@ class DuplicateLayerCommand(Command):
     def undo(self) -> None:
         if hasattr(self.target, "remove_layer_by_id"):
             self.target.remove_layer_by_id(self.duplicated_layer.id, push_history=False)
+        elif hasattr(self.target, "_layers") and self.duplicated_layer in self.target._layers:
+            self.target._layers.remove(self.duplicated_layer)
 
     def redo(self) -> None:
         if hasattr(self.target, "add_layer"):
-            self.target.add_layer(self.duplicated_layer, push_history=False)
+            try:
+                self.target.add_layer(self.duplicated_layer, push_history=False)
+            except TypeError:
+                self.target.add_layer(self.duplicated_layer)
+        elif hasattr(self.target, "_layers"):
+            self.target._layers.append(self.duplicated_layer)
 
 
 class MoveLayerCommand(Command):
@@ -196,13 +246,17 @@ class MoveLayerCommand(Command):
         self.to_idx = to_idx
 
     def undo(self) -> None:
-        if hasattr(self.target, "move_layer_up") and self.from_idx < self.to_idx:
+        if hasattr(self.target, "move_layer"):
+            self.target.move_layer(self.to_idx, self.from_idx)
+        elif hasattr(self.target, "move_layer_up") and self.from_idx < self.to_idx:
             self.target.move_layer_up(self.to_idx)
         elif hasattr(self.target, "move_layer_down"):
             self.target.move_layer_down(self.to_idx)
 
     def redo(self) -> None:
-        if hasattr(self.target, "move_layer_down") and self.from_idx < self.to_idx:
+        if hasattr(self.target, "move_layer"):
+            self.target.move_layer(self.from_idx, self.to_idx)
+        elif hasattr(self.target, "move_layer_down") and self.from_idx < self.to_idx:
             self.target.move_layer_down(self.from_idx)
         elif hasattr(self.target, "move_layer_up"):
             self.target.move_layer_up(self.from_idx)
@@ -217,24 +271,34 @@ class MergeDownCommand(Command):
         self.replaced_layers = replaced_layers
 
     def undo(self) -> None:
-        if hasattr(self.target, "_layers"):
-            if self.merged_layer in self.target._layers:
-                idx = self.target._layers.index(self.merged_layer)
-                self.target._layers[idx:idx + 1] = [lay.clone() for lay in self.replaced_layers]
-            elif 0 <= self.index < len(self.target._layers):
-                self.target._layers[self.index:self.index + 1] = [lay.clone() for lay in self.replaced_layers]
+        target_list = getattr(self.target, "_layers", None)
+        if target_list is None and hasattr(self.target, "layer_stack"):
+            target_list = self.target.layer_stack._layers
+
+        if target_list is not None:
+            if self.merged_layer in target_list:
+                idx = target_list.index(self.merged_layer)
+                target_list[idx:idx + 1] = [lay.clone() for lay in self.replaced_layers]
+            elif 0 <= self.index < len(target_list):
+                target_list[self.index:self.index + 1] = [lay.clone() for lay in self.replaced_layers]
+
         if hasattr(self.target, "invalidate_composite"):
             self.target.invalidate_composite()
         if hasattr(self.target, "layer_selection_changed") and hasattr(self.target, "_active_layer_index"):
             self.target.layer_selection_changed.emit(self.target._active_layer_index)
 
     def redo(self) -> None:
-        if hasattr(self.target, "_layers"):
+        target_list = getattr(self.target, "_layers", None)
+        if target_list is None and hasattr(self.target, "layer_stack"):
+            target_list = self.target.layer_stack._layers
+
+        if target_list is not None:
             for lay in self.replaced_layers:
-                if lay in self.target._layers:
-                    self.target._layers.remove(lay)
-            insert_idx = min(self.index, len(self.target._layers))
-            self.target._layers.insert(insert_idx, self.merged_layer)
+                if lay in target_list:
+                    target_list.remove(lay)
+            insert_idx = min(self.index, len(target_list))
+            target_list.insert(insert_idx, self.merged_layer)
+
         if hasattr(self.target, "invalidate_composite"):
             self.target.invalidate_composite()
         if hasattr(self.target, "layer_selection_changed") and hasattr(self.target, "_active_layer_index"):
@@ -247,7 +311,7 @@ class ApplyAdjustmentCommand(Command):
         self.target = target
         self.adjustments = adjustments
         self.layer = getattr(target, "active_layer", None)
-        self.before_img = self.layer.image.copy() if self.layer else None
+        self.before_img = self.layer.image.copy() if self.layer and getattr(self.layer, "image", None) else None
         from ..image.processing import apply_color_adjustments
         self.after_img = (
             apply_color_adjustments(self.before_img, **adjustments)
@@ -274,7 +338,7 @@ class ApplyFilterCommand(Command):
         self.target = target
         self.filter_name = filter_name
         self.layer = getattr(target, "active_layer", None)
-        self.before_img = self.layer.image.copy() if self.layer else None
+        self.before_img = self.layer.image.copy() if self.layer and getattr(self.layer, "image", None) else None
         from ..image.filters import apply_filter
         self.after_img = (
             apply_filter(self.before_img, filter_name)
@@ -293,4 +357,3 @@ class ApplyFilterCommand(Command):
             self.layer.image = self.after_img.copy()
         if hasattr(self.target, "invalidate_composite"):
             self.target.invalidate_composite()
-

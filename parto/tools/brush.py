@@ -20,6 +20,7 @@ from .base import BaseTool
 class BrushSettings:
     """
     Encapsulates brush configuration parameters and constraints.
+    Authoritative range: 1 to 500 pixels.
     """
 
     def __init__(
@@ -55,6 +56,9 @@ class BrushSettings:
 
     def set_color(self, color: Tuple[int, int, int, int]) -> None:
         self.color = color
+
+    def set_background_color(self, color: Tuple[int, int, int, int]) -> None:
+        self.background_color = color
 
     def increase_size(self, delta: int = 2) -> None:
         self.set_size(self.size + delta)
@@ -140,41 +144,48 @@ class BrushRenderer:
         R = D / 2.0
 
         dist = math.hypot(x2 - x1, y2 - y1)
-        step = max(1.0, settings.size * 0.25)
-        img_w, img_h = target_image.width, target_image.height
-        any_stamped = False
+        step = max(1.0, R * 0.25)
+        num_steps = max(1, int(math.ceil(dist / step)))
 
-        def _stamp(sx: float, sy: float):
-            nonlocal any_stamped
-            px = int(round(sx - R))
-            py = int(round(sy - R))
-            if px + D > 0 and py + D > 0 and px < img_w and py < img_h:
-                any_stamped = True
-                target_image.alpha_composite(dab, dest=(px, py))
+        W, H = target_image.size
+        stamped_any = False
 
-        if dist == 0:
-            _stamp(x1, y1)
-        else:
-            num_steps = max(1, int(round(dist / step)))
-            for i in range(1, num_steps + 1):
-                t = i / num_steps
-                _stamp(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t)
+        for i in range(num_steps + 1):
+            t = float(i) / float(num_steps) if num_steps > 0 else 0.0
+            cx = x1 + (x2 - x1) * t
+            cy = y1 + (y2 - y1) * t
 
-        return any_stamped
+            px = int(round(cx - R))
+            py = int(round(cy - R))
+
+            if px + D <= 0 or px >= W or py + D <= 0 or py >= H:
+                continue
+
+            sx1 = max(0, -px)
+            sy1 = max(0, -py)
+            sx2 = min(D, W - px)
+            sy2 = min(D, H - py)
+
+            if sx2 <= sx1 or sy2 <= sy1:
+                continue
+
+            dab_crop = dab.crop((sx1, sy1, sx2, sy2))
+            dest = (px + sx1, py + sy1)
+            target_image.alpha_composite(dab_crop, dest=dest)
+            stamped_any = True
+
+        return stamped_any
 
 
 class StrokeController:
     """
-    Manages the stroke lifecycle:
-    - Pre-stroke snapshot capture before any pixel modification.
-    - Interpolated segment drawing.
-    - Pixel-level no-op comparison before pushing history.
-    - Deterministic cancellation and cleanup.
+    Manages active stroke lifecycle, coordinate tracking, snapshot captures,
+    and history commits with strict no-op detection.
     """
 
     def __init__(self, settings: BrushSettings, renderer: BrushRenderer):
-        self.settings: BrushSettings = settings
-        self.renderer: BrushRenderer = renderer
+        self.settings = settings
+        self.renderer = renderer
         self.is_drawing: bool = False
         self.last_pt: Optional[QPointF] = None
         self.before_snap: Optional[Any] = None
@@ -183,39 +194,43 @@ class StrokeController:
         self.pixels_modified: bool = False
 
     def start_stroke(self, pt: Any, target: Any, doc: Optional[Any] = None) -> None:
-        """Begin a new stroke, guaranteeing pre-stroke state capture before first pixel change."""
+        """
+        Initiate a brush stroke on the target document / layer.
+        Captures clean pre-stroke state for rollback or undo commitment.
+        """
         self.is_drawing = True
-        p = QPointF(pt.x(), pt.y()) if hasattr(pt, "x") else QPointF(pt[0], pt[1])
+        if hasattr(pt, "x") and hasattr(pt, "y"):
+            p = QPointF(float(pt.x()), float(pt.y()))
+        elif isinstance(pt, QPointF):
+            p = pt
+        else:
+            p = QPointF(float(pt[0]), float(pt[1]))
         self.last_pt = p
         self.pixels_modified = False
 
-        actual_doc = doc
+        # Identify target layer and document
         if hasattr(target, "active_layer"):
-            actual_doc = target
-            layer = actual_doc.active_layer
+            self.target_layer = target.active_layer
+            document = target
         else:
-            layer = target
+            self.target_layer = target
+            document = doc
 
-        self.target_layer = layer
+        if self.target_layer and hasattr(self.target_layer, "image") and self.target_layer.image:
+            self.before_layer_image = self.target_layer.image.copy()
 
-        # 1. Guarantee pre-stroke layer image snapshot BEFORE any pixel modification
-        if layer and hasattr(layer, "image") and layer.image:
-            if layer.image.mode != "RGBA":
-                layer.image = layer.image.convert("RGBA")
-            self.before_layer_image = layer.image.copy()
-
-        # 2. Capture full document snapshot if document is available
-        if actual_doc is not None and hasattr(actual_doc, "_create_snapshot"):
-            self.before_snap = actual_doc._create_snapshot()
+        # Capture complete pre-operation document snapshot
+        if document and hasattr(document, "_create_snapshot"):
+            self.before_snap = document._create_snapshot()
         else:
             self.before_snap = None
 
-        # 3. Render initial dab at stroke start
-        if layer and hasattr(layer, "image") and layer.image:
-            ox = getattr(layer, "offset_x", 0)
-            oy = getattr(layer, "offset_y", 0)
+        # Stamp initial dab
+        if self.target_layer and hasattr(self.target_layer, "image") and self.target_layer.image:
+            ox = getattr(self.target_layer, "offset_x", 0)
+            oy = getattr(self.target_layer, "offset_y", 0)
             stamped = self.renderer.render_segment(
-                layer.image,
+                self.target_layer.image,
                 self.settings,
                 p.x() - ox,
                 p.y() - oy,
@@ -226,24 +241,23 @@ class StrokeController:
                 self.pixels_modified = True
 
     def continue_stroke(self, pt: Any, target: Any) -> None:
-        """Continue drawing an active stroke with interpolated dabs."""
+        """Interpolate and stamp stroke segment from last point to current point."""
         if not self.is_drawing or self.last_pt is None:
             return
 
-        p = QPointF(pt.x(), pt.y()) if hasattr(pt, "x") else QPointF(pt[0], pt[1])
-
-        if hasattr(target, "active_layer"):
-            layer = target.active_layer
+        if hasattr(pt, "x") and hasattr(pt, "y"):
+            p = QPointF(float(pt.x()), float(pt.y()))
+        elif isinstance(pt, QPointF):
+            p = pt
         else:
-            layer = target
+            p = QPointF(float(pt[0]), float(pt[1]))
 
-        if layer and hasattr(layer, "image") and layer.image:
-            if layer.image.mode != "RGBA":
-                layer.image = layer.image.convert("RGBA")
-            ox = getattr(layer, "offset_x", 0)
-            oy = getattr(layer, "offset_y", 0)
+        t_layer = target.active_layer if hasattr(target, "active_layer") else target
+        if t_layer and hasattr(t_layer, "image") and t_layer.image:
+            ox = getattr(t_layer, "offset_x", 0)
+            oy = getattr(t_layer, "offset_y", 0)
             stamped = self.renderer.render_segment(
-                layer.image,
+                t_layer.image,
                 self.settings,
                 self.last_pt.x() - ox,
                 self.last_pt.y() - oy,
@@ -263,7 +277,6 @@ class StrokeController:
         self.is_drawing = False
         self.last_pt = None
 
-        # Verify pixel-level modifications against the pre-stroke baseline
         has_pixel_change = False
         if (
             self.target_layer is not None
@@ -271,13 +284,11 @@ class StrokeController:
             and self.target_layer.image is not None
             and self.before_layer_image is not None
         ):
-            # Fast binary byte comparison of RGBA pixel buffers
             has_pixel_change = (
                 self.target_layer.image.tobytes() != self.before_layer_image.tobytes()
             )
 
         if not has_pixel_change:
-            # NO-OP: No actual pixel changed (transparent, identical color, or out-of-bounds)
             self.before_snap = None
             self.before_layer_image = None
             self.target_layer = None
@@ -286,9 +297,7 @@ class StrokeController:
                 doc.invalidate_composite()
             return False
 
-        # Pixels were modified: Ensure before_snap correctly contains pre-stroke image data
         if self.before_snap is None and hasattr(doc, "_create_snapshot"):
-            # Construct authoritative snapshot with target layer restored to pre-stroke bytes
             self.before_snap = doc._create_snapshot()
             target_id = getattr(self.target_layer, "id", None)
             target_name = getattr(self.target_layer, "name", None)
@@ -302,7 +311,6 @@ class StrokeController:
                 if not found and self.before_snap["layer_stack"].active_layer:
                     self.before_snap["layer_stack"].active_layer.image = self.before_layer_image.copy()
 
-        # Push to document history
         if hasattr(doc, "set_modified"):
             doc.set_modified(True)
 
@@ -325,7 +333,6 @@ class StrokeController:
         if hasattr(doc, "invalidate_composite"):
             doc.invalidate_composite()
 
-        # Cleanup stroke state
         self.before_snap = None
         self.before_layer_image = None
         self.target_layer = None
@@ -366,6 +373,17 @@ class BrushTool(BaseTool):
         self.renderer = BrushRenderer()
         self.stroke_controller = StrokeController(self.settings, self.renderer)
 
+    def deactivate(self, canvas: Any) -> None:
+        """Safely terminate active stroke when switching tools or deactivating."""
+        if self._is_drawing:
+            doc = getattr(canvas, "document", None)
+            if doc:
+                self.end_stroke(doc)
+            else:
+                self.cancel_stroke()
+            if hasattr(canvas, "update_composite_pixmap"):
+                canvas.update_composite_pixmap()
+
     # --- Delegated Properties ---
 
     @property
@@ -382,7 +400,7 @@ class BrushTool(BaseTool):
 
     @background_color.setter
     def background_color(self, value: Tuple[int, int, int, int]) -> None:
-        self.settings.background_color = value
+        self.settings.set_background_color(value)
 
     @property
     def size(self) -> int:
@@ -464,11 +482,14 @@ class BrushTool(BaseTool):
     def _cached_dab(self, val: Optional[Image.Image]) -> None:
         self.renderer._cached_dab = val
 
-    # --- Delegated Setting Modifiers ---
+    # --- Setting Modifiers ---
 
     def set_color(self, color: Tuple[int, int, int, int]) -> None:
         self.settings.set_color(color)
         self.renderer.invalidate_cache()
+
+    def set_background_color(self, color: Tuple[int, int, int, int]) -> None:
+        self.settings.set_background_color(color)
 
     def set_size(self, size: int) -> None:
         self.settings.set_size(size)
@@ -518,19 +539,15 @@ class BrushTool(BaseTool):
     # --- Authoritative Stroke Lifecycle ---
 
     def start_stroke(self, pt: Any, target: Any, doc: Optional[Any] = None) -> None:
-        """Begin a new brush stroke."""
         self.stroke_controller.start_stroke(pt, target, doc=doc)
 
     def continue_stroke(self, pt: Any, target: Any) -> None:
-        """Continue drawing an active brush stroke."""
         self.stroke_controller.continue_stroke(pt, target)
 
     def end_stroke(self, doc: Any) -> bool:
-        """Commit an active brush stroke to history."""
         return self.stroke_controller.end_stroke(doc)
 
     def cancel_stroke(self, doc: Optional[Any] = None) -> None:
-        """Cancel stroke in progress and restore original layer snapshot."""
         self.stroke_controller.cancel_stroke(doc)
 
     # --- UI Synchronization & Input Handling ---
@@ -541,7 +558,9 @@ class BrushTool(BaseTool):
             bar = mw.brush_bar
             if hasattr(bar, "set_size"):
                 bar.set_size(self.size)
-            if hasattr(bar, "set_color"):
+            if hasattr(bar, "set_colors"):
+                bar.set_colors(self.color, self.background_color)
+            elif hasattr(bar, "set_color"):
                 bar.set_color(self.color)
             if hasattr(bar, "set_opacity"):
                 bar.set_opacity(self.opacity)
@@ -576,7 +595,6 @@ class BrushTool(BaseTool):
         if not doc or not doc.has_image or not doc.active_layer:
             return False
 
-        # Unified stroke entry point
         self.start_stroke(scene_pos, doc)
         doc.invalidate_composite()
         canvas.update_composite_pixmap()
@@ -590,7 +608,6 @@ class BrushTool(BaseTool):
         if not doc or not doc.active_layer:
             return False
 
-        # Unified stroke continuation
         self.continue_stroke(scene_pos, doc)
         doc.invalidate_composite()
         canvas.update_composite_pixmap()
@@ -600,7 +617,6 @@ class BrushTool(BaseTool):
         if event.button() == Qt.LeftButton and self._is_drawing:
             doc = getattr(canvas, "document", None)
             if doc:
-                # Unified stroke commit
                 self.end_stroke(doc)
                 canvas.update_composite_pixmap()
             return True

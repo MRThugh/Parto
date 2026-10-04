@@ -1,10 +1,10 @@
 {
   "name": "parto",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Parto — Lightweight Desktop Image Editor",
   "private": true,
   "scripts": {
-    "dev": "python3 -m http.server 3000 --bind 0.0.0.0",
+    "dev": "python3 server.py",
     "build": "python3 -m compileall -q .",
     "lint": "python3 -m compileall -q .",
     "test": "QT_QPA_PLATFORM=offscreen pytest"
