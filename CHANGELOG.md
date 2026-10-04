@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.1] - 2026-10-04
 
 ### Fixed
+- **Merge Down & Blend Mode Correctness (`parto.image.layers`)**:
+  - Fixed compositing bug where merging an upper layer down into a lower layer with a non-normal blend mode (e.g. `multiply`, `screen`, `overlay`) caused double-blending against underlying background layers.
+  - Reset `lower.blend_mode = "normal"` upon flattening two visible layers, correctly preserving the rendered visual composite before and after merge.
+  - Corrected Porter-Duff / W3C alpha blending in `_blend_mode_composite` to properly handle transparent or semi-transparent backdrops ($ba < 1.0$) without clipping to black.
+  - Added dedicated regression test suite (`test_parto_v032_merge_blend.py`) covering multi-layer blend mode preservation and history undo/redo.
 - **Canonical Vector Icon Aliases**:
   - Resolved missing icon warnings on startup by mapping toolbar and transform action identifiers (`tool_move`, `tool-move`, `tool_crop`, `tool-crop`, `tool_brush`, `tool-brush`, `tool_eyedropper`, `tool-eyedropper`, `rot_left`, `rot-left`, `rot_right`, `rot-right`) to existing canonical vector renderers (`move`, `crop`, `brush`, `eyedropper`, `rotate-ccw`, `rotate-cw`).
   - Audited all 37 application icon categories across New, Open, Save, Export, Transforms, Layers, Tools, and Dialogs to guarantee warning-free rendering.

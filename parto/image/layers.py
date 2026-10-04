@@ -146,9 +146,21 @@ def _blend_mode_composite(
     out_g = np.zeros_like(rg)
     out_b = np.zeros_like(rb)
 
-    out_r[mask] = (rr[mask] * ta[mask] + br[mask] * ba[mask] * (1.0 - ta[mask])) / out_a[mask]
-    out_g[mask] = (rg[mask] * ta[mask] + bg[mask] * ba[mask] * (1.0 - ta[mask])) / out_a[mask]
-    out_b[mask] = (rb[mask] * ta[mask] + bb[mask] * ba[mask] * (1.0 - ta[mask])) / out_a[mask]
+    term_blend_r = ta * ba * rr
+    term_blend_g = ta * ba * rg
+    term_blend_b = ta * ba * rb
+
+    term_src_r = ta * (1.0 - ba) * tr
+    term_src_g = ta * (1.0 - ba) * tg
+    term_src_b = ta * (1.0 - ba) * tb
+
+    term_back_r = ba * (1.0 - ta) * br
+    term_back_g = ba * (1.0 - ta) * bg
+    term_back_b = ba * (1.0 - ta) * bb
+
+    out_r[mask] = (term_blend_r[mask] + term_src_r[mask] + term_back_r[mask]) / out_a[mask]
+    out_g[mask] = (term_blend_g[mask] + term_src_g[mask] + term_back_g[mask]) / out_a[mask]
+    out_b[mask] = (term_blend_b[mask] + term_src_b[mask] + term_back_b[mask]) / out_a[mask]
 
     out_arr = np.dstack([out_r, out_g, out_b, out_a])
     blended_crop = Image.fromarray((np.clip(out_arr, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8), mode="RGBA")
@@ -348,6 +360,7 @@ class LayerStack:
             lower.offset_x = 0
             lower.offset_y = 0
             lower.opacity = 1.0
+            lower.blend_mode = "normal"
             lower.visible = True
         elif lower.visible and not upper.visible:
             # Upper hidden: contributes nothing to visible pixels
@@ -364,6 +377,7 @@ class LayerStack:
             lower.offset_x = 0
             lower.offset_y = 0
             lower.opacity = 1.0
+            lower.blend_mode = upper.blend_mode or "normal"
             lower.visible = True
         else:
             # Both hidden: composite them for internal buffer, remain hidden
@@ -376,6 +390,7 @@ class LayerStack:
             lower.offset_x = 0
             lower.offset_y = 0
             lower.opacity = 1.0
+            lower.blend_mode = "normal"
             lower.visible = False
 
         self._layers.pop(index)
