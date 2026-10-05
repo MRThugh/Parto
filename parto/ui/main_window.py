@@ -186,12 +186,18 @@ class MainWindow(QMainWindow):
         self.adjustments_animator.toggle(animate=animate)
 
     def toggle_brush_dock(self, animate: bool = True):
-        self.brush_animator.toggle(animate=animate)
+        if not self.brush_dock.isVisible():
+            if not self.tb_tool_brush.isChecked():
+                self.action_tool_brush()
+            else:
+                self.brush_animator.show_dock(animate=animate)
+        else:
+            self.brush_animator.hide_dock(animate=animate)
 
     def set_brush_dock_visible(self, visible: bool, animate: bool = True):
         self.brush_animator.set_visible(visible, animate=animate)
         sm = get_shortcut_manager()
-        defn = sm.get("view_brush")
+        defn = sm.get("brush_studio") or sm.get("view_brush")
         if defn and defn.action:
             defn.action.setChecked(visible)
 
@@ -497,6 +503,8 @@ class MainWindow(QMainWindow):
         self.brush_bar.hide()
         if hasattr(self, "brush_dock"):
             self.brush_dock.hide()
+        if hasattr(self, "brush_menu"):
+            self.brush_menu.menuAction().setVisible(False)
         self.canvas.set_tool(self.tool_move)
         self.tb_tool_move.setChecked(True)
 
@@ -506,6 +514,8 @@ class MainWindow(QMainWindow):
         self.brush_bar.hide()
         if hasattr(self, "brush_dock"):
             self.brush_dock.hide()
+        if hasattr(self, "brush_menu"):
+            self.brush_menu.menuAction().setVisible(False)
         self.crop_bar.show()
         self.crop_bar.set_dimension_text(f"{self.document.width} × {self.document.height} px")
         self.canvas.set_tool(self.tool_crop)
@@ -528,6 +538,8 @@ class MainWindow(QMainWindow):
     def action_tool_brush(self):
         self.crop_bar.hide()
         self.brush_bar.show()
+        if hasattr(self, "brush_menu"):
+            self.brush_menu.menuAction().setVisible(True)
         if hasattr(self, "brush_dock"):
             self.brush_dock.show()
             self.brush_dock.raise_()
@@ -544,20 +556,26 @@ class MainWindow(QMainWindow):
         self.brush_bar.hide()
         if hasattr(self, "brush_dock"):
             self.brush_dock.hide()
+        if hasattr(self, "brush_menu"):
+            self.brush_menu.menuAction().setVisible(False)
         self.canvas.set_tool(self.tool_eyedropper)
         self.tb_tool_eyedropper.setChecked(True)
         self.toast.show_message("Eyedropper active — Click pixel to sample color")
 
     def action_focus_brush_presets(self):
         """Focus presets in Brush Studio (Ctrl+Shift+B)."""
-        if hasattr(self, "set_brush_dock_visible") and not self.brush_dock.isVisible():
+        if not self.tb_tool_brush.isChecked():
+            self.action_tool_brush()
+        elif hasattr(self, "set_brush_dock_visible") and not self.brush_dock.isVisible():
             self.set_brush_dock_visible(True, animate=True)
         if hasattr(self.brush_dock, "focus_search"):
             self.brush_dock.focus_search()
 
     def action_focus_brush_properties(self):
         """Focus tip properties in Brush Studio (Alt+B)."""
-        if hasattr(self, "set_brush_dock_visible") and not self.brush_dock.isVisible():
+        if not self.tb_tool_brush.isChecked():
+            self.action_tool_brush()
+        elif hasattr(self, "set_brush_dock_visible") and not self.brush_dock.isVisible():
             self.set_brush_dock_visible(True, animate=True)
         if hasattr(self.brush_dock, "focus_properties"):
             self.brush_dock.focus_properties()

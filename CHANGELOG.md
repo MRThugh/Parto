@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+- **Modular Document Domain Subsystem (`parto/document/`)**:
+  - Independent, engineering-grade domain architecture separating document state, transformation engines, compositing, persistence, transactions, and presentations.
+  - Dedicated state model (`DocumentState`) managing canvas dimensions, file path, modified tracking, and authoritative `LayerStack` ownership.
+  - Domain engines (`DocumentEngine`, `TransformEngine`, `CompositingEngine`) coordinating offset-aware transformations, non-destructive preview rendering, and layer adjustments without duplicating image-processing algorithms.
+  - Persistence adapter (`DocumentStorageAdapter`) providing safe image loading with EXIF orientation normalization, HEIF fallback, and format saving.
+  - Centralized transaction coordinator (`TransactionCoordinator`) executing deep state snapshotting, snapshot equality comparison, and atomic undo/redo restoration.
+  - Document domain controller (`DocumentController`) orchestrating domain actions, state mutations, and signal notifications.
+  - Authoritative `Document` domain model and facade retaining full backward compatibility for `parto/editor/document.py` and `EditorEngine`.
+- **Focused Architectural Test Suite (`test_document_subsystem_architecture.py`, `test_contextual_brush_menu.py`)**:
+  - 10 new unit and UI integration tests verifying state isolation, transform engines, compositing previews, storage adapters, transaction histories, and contextual menu lifecycles (bringing total coverage to **297 passed tests**).
+
+### Changed
+- **Refactored Document Responsibilities**:
+  - Transformed `Document` from a multi-responsibility god object into a clean domain boundary and facade.
+  - Eliminated duplicate state representation; `DocumentState` acts as the single source of truth for canvas dimensions and layer collections.
+  - Decoupled `parto/document/` from GUI and editor dependencies, establishing strict unidirectional architecture: `UI -> Controllers / Facades -> Domain -> Engines / Processing -> Pillow`.
+- **Improved Layer and History Integration Boundaries**:
+  - Preserved `LayerStack` as the authoritative layer state while standardizing transaction boundaries with `HistoryManager`.
+  - Maintained complete undo/redo support across painting, layer operations, crop, resize, rotate, flip, filters, and adjustments without altering user editing workflows.
+- **Contextual Brush Studio Architecture**:
+  - Brush Studio is now treated as a contextual Brush feature rather than a global View-menu item.
+  - Dynamically displays a dedicated `&Brush` menu when the Brush Tool is active, exposing Brush Studio (`F9`), preset navigation (`Ctrl+Shift+B`), tip property focus (`Alt+B`), mode cycling (`Shift+B`), defaults reset (`Shift+F9`), and size/hardness adjustments.
+  - Automatically hides the contextual Brush menu and studio dock when switching to Move, Crop, or Eyedropper tools while strictly preserving all active brush settings (size, opacity, hardness, palette colors, eraser mode).
+
+### Fixed
+- **Brush Studio Global View-Menu Exposure**:
+  - Removed `Brush Studio` from the global `View` menu where it was erroneously displayed regardless of active tool context.
+  - Synchronized Brush Studio dock toggle, shortcuts, and menubar representation with active tool changes.
+
+---
+
 ## [0.3.1] - 2026-10-04
 
 ### Added

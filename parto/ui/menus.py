@@ -142,112 +142,6 @@ class EditorMenuBar:
 
             window.adjustments_dock.visibilityChanged.connect(_sync_adj_action)
 
-        if hasattr(window, "brush_dock"):
-            act_tbrush = sm.register("view_brush", "Brush Studio", "View", "F9", "Toggle Brush Studio Panel", view_menu.addAction("Brush Studio"))
-            act_tbrush.action.setCheckable(True)
-            act_tbrush.action.setChecked(window.brush_dock.isVisible())
-            if hasattr(window, "set_brush_dock_visible"):
-                act_tbrush.action.toggled.connect(lambda checked: window.set_brush_dock_visible(checked, animate=True))
-            else:
-                act_tbrush.action.toggled.connect(window.brush_dock.setVisible)
-
-            def _sync_brush_action(vis: bool):
-                try:
-                    action = act_tbrush.action
-                    if action is not None and action.isChecked() != vis:
-                        action.blockSignals(True)
-                        action.setChecked(vis)
-                        action.blockSignals(False)
-                except (RuntimeError, AttributeError):
-                    pass
-
-            window.brush_dock.visibilityChanged.connect(_sync_brush_action)
-
-            # --- Dedicated Brush Shortcuts ---
-            # 1. Focus Presets (Ctrl+Shift+B)
-            act_bfocus_presets = sm.register(
-                "brush_focus_presets",
-                "Focus Brush Presets",
-                "Brush",
-                "Ctrl+Shift+B",
-                "Focus search and navigation in Brush Presets grid",
-            )
-            act_bfocus_presets_action = QAction("Focus Brush Presets", window)
-            act_bfocus_presets_action.triggered.connect(getattr(window, "action_focus_brush_presets", lambda: None))
-            window.addAction(act_bfocus_presets_action)
-            sm.register("brush_focus_presets", "Focus Brush Presets", "Brush", "Ctrl+Shift+B", "Focus search and navigation in Brush Presets grid", act_bfocus_presets_action)
-
-            # 2. Focus Properties (Alt+B)
-            act_bfocus_props = sm.register(
-                "brush_focus_properties",
-                "Focus Brush Properties",
-                "Brush",
-                "Alt+B",
-                "Focus Brush Tip Size slider and properties",
-            )
-            act_bfocus_props_action = QAction("Focus Brush Properties", window)
-            act_bfocus_props_action.triggered.connect(getattr(window, "action_focus_brush_properties", lambda: None))
-            window.addAction(act_bfocus_props_action)
-            sm.register("brush_focus_properties", "Focus Brush Properties", "Brush", "Alt+B", "Focus Brush Tip Size slider and properties", act_bfocus_props_action)
-
-            # 3. Reset Brush (Shift+F9)
-            act_breset = sm.register(
-                "brush_reset_settings",
-                "Reset Brush Settings",
-                "Brush",
-                "Shift+F9",
-                "Reset active brush parameters to preset defaults",
-            )
-            act_breset_action = QAction("Reset Brush Settings", window)
-            act_breset_action.triggered.connect(getattr(window, "action_reset_brush", lambda: None))
-            window.addAction(act_breset_action)
-            sm.register("brush_reset_settings", "Reset Brush Settings", "Brush", "Shift+F9", "Reset active brush parameters to preset defaults", act_breset_action)
-
-            # 4. Cycle Brush Mode / Eraser (Shift+B)
-            act_bmode = sm.register(
-                "brush_cycle_mode",
-                "Cycle Brush Mode",
-                "Brush",
-                "Shift+B",
-                "Toggle between normal painting and eraser mode",
-            )
-            act_bmode_action = QAction("Cycle Brush Mode", window)
-            act_bmode_action.triggered.connect(getattr(window, "action_cycle_brush_mode", lambda: None))
-            window.addAction(act_bmode_action)
-            sm.register("brush_cycle_mode", "Cycle Brush Mode", "Brush", "Shift+B", "Toggle between normal painting and eraser mode", act_bmode_action)
-
-            # 5. Decrease / Increase Brush Size ([ and ])
-            act_bsize_dec = sm.register(
-                "brush_decrease_size",
-                "Decrease Brush Size",
-                "Brush",
-                "[",
-                "Decrease brush tip diameter by 2 px",
-            )
-            act_bsize_inc = sm.register(
-                "brush_increase_size",
-                "Increase Brush Size",
-                "Brush",
-                "]",
-                "Increase brush tip diameter by 2 px",
-            )
-
-            # 6. Decrease / Increase Brush Hardness (Ctrl+[ and Ctrl+])
-            act_bhard_dec = sm.register(
-                "brush_decrease_hardness",
-                "Decrease Brush Hardness",
-                "Brush",
-                "Ctrl+[",
-                "Decrease brush tip hardness by 10%",
-            )
-            act_bhard_inc = sm.register(
-                "brush_increase_hardness",
-                "Increase Brush Hardness",
-                "Brush",
-                "Ctrl+]",
-                "Increase brush tip hardness by 10%",
-            )
-
         # ==========================================
         # 4. IMAGE MENU
         # ==========================================
@@ -344,7 +238,88 @@ class EditorMenuBar:
         act_teye.action.triggered.connect(window.action_tool_eyedropper)
 
         # ==========================================
-        # 8. THEME MENU
+        # 8. CONTEXTUAL BRUSH MENU
+        # ==========================================
+        brush_menu = menu_bar.addMenu("&Brush")
+        window.brush_menu = brush_menu
+
+        # 1. Brush Studio (checkable dock toggle)
+        act_tbrush = sm.register(
+            "brush_studio",
+            "Brush Studio",
+            "Brush",
+            "F9",
+            "Toggle Brush Studio Panel",
+            brush_menu.addAction("Brush Studio"),
+        )
+        act_tbrush.action.setCheckable(True)
+        act_tbrush.action.setChecked(window.brush_dock.isVisible() if hasattr(window, "brush_dock") else False)
+        if hasattr(window, "set_brush_dock_visible"):
+            act_tbrush.action.toggled.connect(lambda checked: window.set_brush_dock_visible(checked, animate=True))
+        elif hasattr(window, "brush_dock"):
+            act_tbrush.action.toggled.connect(window.brush_dock.setVisible)
+        window.act_brush_studio = act_tbrush.action
+
+        def _sync_brush_action(vis: bool):
+            try:
+                action = act_tbrush.action
+                if action is not None and action.isChecked() != vis:
+                    action.blockSignals(True)
+                    action.setChecked(vis)
+                    action.blockSignals(False)
+            except (RuntimeError, AttributeError):
+                pass
+
+        if hasattr(window, "brush_dock"):
+            window.brush_dock.visibilityChanged.connect(_sync_brush_action)
+
+        # 2. Focus Presets (Ctrl+Shift+B)
+        act_bfocus_presets_action = brush_menu.addAction("Brush Presets...")
+        act_bfocus_presets_action.triggered.connect(getattr(window, "action_focus_brush_presets", lambda: None))
+        sm.register("brush_focus_presets", "Focus Brush Presets", "Brush", "Ctrl+Shift+B", "Focus search and navigation in Brush Presets grid", act_bfocus_presets_action)
+
+        # 3. Focus Properties (Alt+B)
+        act_bfocus_props_action = brush_menu.addAction("Brush Properties...")
+        act_bfocus_props_action.triggered.connect(getattr(window, "action_focus_brush_properties", lambda: None))
+        sm.register("brush_focus_properties", "Focus Brush Properties", "Brush", "Alt+B", "Focus Brush Tip Size slider and properties", act_bfocus_props_action)
+
+        brush_menu.addSeparator()
+
+        # 4. Reset Brush (Shift+F9)
+        act_breset_action = brush_menu.addAction("Reset Brush Settings")
+        act_breset_action.triggered.connect(getattr(window, "action_reset_brush", lambda: None))
+        sm.register("brush_reset_settings", "Reset Brush Settings", "Brush", "Shift+F9", "Reset active brush parameters to preset defaults", act_breset_action)
+
+        # 5. Cycle Brush Mode / Eraser (Shift+B)
+        act_bmode_action = brush_menu.addAction("Cycle Paint / Eraser Mode")
+        act_bmode_action.triggered.connect(getattr(window, "action_cycle_brush_mode", lambda: None))
+        sm.register("brush_cycle_mode", "Cycle Brush Mode", "Brush", "Shift+B", "Toggle between normal painting and eraser mode", act_bmode_action)
+
+        brush_menu.addSeparator()
+
+        # 6. Decrease / Increase Brush Size ([ and ])
+        act_bsize_dec_action = brush_menu.addAction("Decrease Brush Size")
+        act_bsize_dec_action.triggered.connect(lambda: window.tool_brush.set_size(max(1, window.tool_brush.size - 2)) if hasattr(window, "tool_brush") else None)
+        sm.register("brush_decrease_size", "Decrease Brush Size", "Brush", "[", "Decrease brush tip diameter by 2 px", act_bsize_dec_action)
+
+        act_bsize_inc_action = brush_menu.addAction("Increase Brush Size")
+        act_bsize_inc_action.triggered.connect(lambda: window.tool_brush.set_size(min(500, window.tool_brush.size + 2)) if hasattr(window, "tool_brush") else None)
+        sm.register("brush_increase_size", "Increase Brush Size", "Brush", "]", "Increase brush tip diameter by 2 px", act_bsize_inc_action)
+
+        # 7. Decrease / Increase Brush Hardness (Ctrl+[ and Ctrl+])
+        act_bhard_dec_action = brush_menu.addAction("Decrease Brush Hardness")
+        act_bhard_dec_action.triggered.connect(lambda: window.tool_brush.set_hardness(max(0.0, window.tool_brush.hardness - 0.10)) if hasattr(window, "tool_brush") else None)
+        sm.register("brush_decrease_hardness", "Decrease Brush Hardness", "Brush", "Ctrl+[", "Decrease brush tip hardness by 10%", act_bhard_dec_action)
+
+        act_bhard_inc_action = brush_menu.addAction("Increase Brush Hardness")
+        act_bhard_inc_action.triggered.connect(lambda: window.tool_brush.set_hardness(min(1.0, window.tool_brush.hardness + 0.10)) if hasattr(window, "tool_brush") else None)
+        sm.register("brush_increase_hardness", "Increase Brush Hardness", "Brush", "Ctrl+]", "Increase brush tip hardness by 10%", act_bhard_inc_action)
+
+        # Contextual visibility: Initially hidden until Brush tool is activated
+        brush_menu.menuAction().setVisible(False)
+
+        # ==========================================
+        # 9. THEME MENU
         # ==========================================
         theme_menu = menu_bar.addMenu("&Theme")
         theme_group = QActionGroup(window)

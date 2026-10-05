@@ -214,9 +214,13 @@ class ShortcutManager:
         return True
 
     def __contains__(self, action_id: str) -> bool:
+        if action_id == "view_brush" and "view_brush" not in self._shortcuts:
+            return "brush_studio" in self._shortcuts
         return action_id in self._shortcuts
 
     def get(self, action_id: str) -> Optional[ShortcutDefinition]:
+        if action_id == "view_brush" and "view_brush" not in self._shortcuts:
+            return self._shortcuts.get("brush_studio")
         return self._shortcuts.get(action_id)
 
     def get_all(self) -> List[ShortcutDefinition]:

@@ -10,8 +10,20 @@
 
 ---
 
-## Highlights of Version 0.3.1
+## Architectural Highlights
 
+- **Modular Document Domain Subsystem (`parto/document/`)**:
+  - Independent, engineering-grade domain architecture separating state, engines, persistence, transactions, and presentation.
+  - **State Model (`DocumentState`)**: Authoritative container managing canvas dimensions, file path, modified tracking, and layer stack ownership.
+  - **Engines (`DocumentEngine`, `TransformEngine`, `CompositingEngine`)**: Thin domain coordinators delegating to underlying image and geometry routines without duplicating image processing logic.
+  - **Persistence (`DocumentStorageAdapter`)**: Decoupled file I/O handling format resolution, memory copying, and EXIF orientation normalization.
+  - **History Integration (`TransactionCoordinator`)**: Deep snapshotting, strict equality comparison, and atomic undo/redo restoration.
+  - **Controller & Facade (`DocumentController`, `Document`)**: High-level domain boundary providing reactive Qt signals (`document_changed`, `layer_selection_changed`, `modified_changed`) while ensuring the domain core remains GUI-independent.
+  - **Full Backward Compatibility**: Seamless re-export shim via `parto/editor/document.py` and `EditorEngine`.
+- **Contextual Brush Studio Architecture**:
+  - Context-aware menu integration: Brush Studio is no longer exposed as a static global View menu item.
+  - When the **Brush Tool (`B`)** is selected, a dedicated contextual **Brush menu** (`&Brush`) dynamically appears in the menu bar, exposing Brush Studio (`F9`), preset navigation (`Ctrl+Shift+B`), tip property focus (`Alt+B`), mode cycling (`Shift+B`), defaults reset (`Shift+F9`), and size/hardness controls.
+  - Navigating to Move, Crop, or Eyedropper tools automatically withdraws the contextual menu and studio dock while strictly preserving all active brush settings (size, opacity, hardness, color palette, eraser mode).
 - **Professional Brush Studio Subsystem (`parto/brush/`, `parto/ui/panels/brush/`)**:
   - Modular studio dock (`BrushStudioDock`) with live-rendered dab preview, current preset summary, and quick action drawer.
   - Interactive preset grid (`PresetGridWidget`) with live stroke thumbnails, search filtering, category tabs, right-click context menu, and single-preset JSON import/export.
@@ -20,9 +32,8 @@
   - Dynamics modulation engine for Size, Opacity, Flow, and Angle targeting Pressure, Velocity, Tilt, and Random jitter.
   - Interactive Color management with live foreground and background chips, color swap (`X`), color reset (`D`), and 8-color quick palette swatches.
   - Anti-aliased stroke smoothing and scatter jitter controls.
-- **Authoritative Single-Document Architecture**: Unified state management through `Document` (`parto.editor.document`) and `LayerStack` (`parto.image.layers`). All image processing, layer compositing, transformations, filters, and color adjustments route through the central document model. `EditorEngine` operates as a seamless backward-compatibility shim.
-- **Multi-Layer System**:
-  - Non-destructive RGBA layer stack with per-layer opacity, vector eye visibility toggles, duplication, reordering, and merge down operations.
+- **Multi-Layer System (`parto/image/layers.py`)**:
+  - Non-destructive RGBA layer stack with per-layer opacity, vector eye visibility toggles, duplication, reordering, and visibility-aware merge down operations.
   - Interactive Layers Panel (`F7`) with continuous opacity slider history coalescing (one undo step per drag gesture).
   - Panels closed by default on startup for maximum canvas workspace.
 - **Live Non-Destructive Adjustments Panel (`F8`)**:
@@ -36,8 +47,8 @@
   - Smooth 200ms crossfade animation (`transition_theme`) using `QGraphicsOpacityEffect` and `QPropertyAnimation`.
 - **High-DPI Vector Icon System**:
   - Resolution-independent icons rendered via `QPainter` paths with canonical alias normalization.
-- **Robust 287-Test Automated Verification**:
-  - 287 automated tests validating brush studio properties, presets, dab generation, layers, command history, eyedropper, shortcuts, and theme palettes.
+- **Robust 297-Test Automated Verification**:
+  - 297 automated tests validating document state isolation, transform engines, compositing, storage adapters, brush studio properties, presets, dab generation, layers, command history, shortcuts, and theme palettes.
 
 ---
 
@@ -56,9 +67,60 @@ Parto supports a wide range of standard and modern image formats through Pillow 
 
 ---
 
-## Architecture & Package Structure
+## Subsystem Architecture & Dependency Direction
 
+Parto is organized into focused, single-responsibility subsystems with strict unidirectional dependencies:
+
+```text
+                         Parto
+                           │
+             ┌─────────────┼─────────────┐
+             │             │             │
+             ▼             ▼             ▼
+         Document        Brush         UI
+             │             │
+       ┌─────┼─────┐       │
+       │     │     │       │
+       ▼     ▼     ▼       ▼
+     State Layers History  Brush Engine
+       │     │     │       │
+       └─────┼─────┘       │
+             ▼             │
+        Document Engine    │
+             │             │
+             └──────┬──────┘
+                    ▼
+              Image Processing
+                    │
+                    ▼
+                  Pillow
 ```
+
+### Responsibility Boundaries
+
+1. **Document Subsystem (`parto/document/`)**:
+   - `models/`: Authoritative `DocumentState` and `DocumentMetadata`.
+   - `engine/`: `DocumentEngine` orchestrating `TransformEngine` and `CompositingEngine`.
+   - `adapters/`: `DocumentStorageAdapter` for format I/O and EXIF normalization.
+   - `history/`: `TransactionCoordinator` managing state snapshots, dirty detection, and command dispatch.
+   - `controller/`: `DocumentController` executing domain actions and driving signals.
+   - `document.py`: Central `Document` domain model and Qt reactive facade.
+2. **Brush Subsystem (`parto/brush/`)**:
+   - Pure domain `BrushSettings`, preset management, dab generation, stroke execution, and document integration adapter.
+3. **Layers Subsystem (`parto/image/layers.py`)**:
+   - Authoritative `Layer` and `LayerStack` collections, blend modes, and Porter-Duff compositing.
+4. **History Subsystem (`parto/history/`)**:
+   - Command pattern execution, revision numbering, clean save-point markers, and undo/redo stacks.
+5. **Image Processing Subsystem (`parto/image/`)**:
+   - Low-level transformations (`transforms.py`), photographic filters (`filters.py`), and color processing (`processing.py`).
+6. **UI Subsystem (`parto/ui/`)**:
+   - Main window orchestration, contextual tool menus, toolbars, statusbar, and dock animators.
+
+---
+
+## Package Structure
+
+```text
 Parto/
 ├── main.py                    # Application entry point, High-DPI configuration & ThemeManager bootstrap
 ├── window.py                  # Backward-compatibility re-export shim for MainWindow
@@ -66,16 +128,25 @@ Parto/
 ├── image.py                   # Backward-compatibility re-export shim for conversions & metadata
 ├── icons.py                   # Backward-compatibility re-export shim for vector icons
 ├── parto/                     # Core application package
+│   ├── document/              # Modular Document Domain Subsystem
+│   │   ├── models/            # DocumentState, DocumentMetadata
+│   │   ├── engine/            # DocumentEngine, TransformEngine, CompositingEngine
+│   │   ├── adapters/          # DocumentStorageAdapter
+│   │   ├── history/           # TransactionCoordinator, snapshots_equal
+│   │   ├── controller/        # DocumentController
+│   │   ├── geometry.py        # Coordinate math & offset-aware layer transforms
+│   │   └── document.py        # Authoritative Document domain model & facade
 │   ├── brush/                 # Professional Brush Subsystem
 │   │   ├── models/            # BrushSettings, BrushPreset, enums (BlendMode, DynamicsControl)
 │   │   ├── engine/            # DabGenerator, BrushRenderer, BrushEngine
 │   │   ├── presets/           # Builtin presets factory, PresetManager, PresetStorage (JSON)
 │   │   ├── controller/        # BrushController & StrokeController
 │   │   ├── input/             # PointerState & InputNormalizer
+│   │   ├── document_adapter.py# Document and LayerStack integration boundary
 │   │   └── tools/             # BrushTool
-│   ├── editor/                # Document model, Canvas, SelectionBox geometry & EditorEngine
+│   ├── editor/                # Canvas, SelectionBox geometry & EditorEngine compatibility shim
 │   ├── image/                 # Layers, LayerStack, Filters, Transforms & Safe Export
-│   ├── history/               # Command pattern base, Snapshot & Domain Commands, HistoryManager
+│   ├── history/               # Command pattern base, SnapshotCommand, HistoryManager
 │   ├── shortcuts/             # Centralized ShortcutManager & ShortcutDefinition registry
 │   ├── tools/                 # BaseTool, MoveTool, CropTool, BrushTool, EyedropperTool
 │   ├── themes/                # ThemeManager singleton & dynamic palettes (Dark, Light, Graphite, Midnight, Nord)
@@ -86,7 +157,7 @@ Parto/
 │   │   │   └── brush/         # BrushStudioDock: Header, Presets, Properties, Dynamics, Color, Blend, Advanced
 │   │   └── dialogs/           # Shortcuts, About, Resize, Image Info, Filter Gallery, Command Palette
 │   └── utils/                 # Path helpers, settings persistence & error formatting
-├── tests/                     # Automated unit, integration, and UI test suites (287 tests)
+├── tests/                     # Automated unit, integration, regression, and UI test suites (297 tests)
 ├── requirements.txt           # Python package dependencies
 ├── logo.png                   # Parto application branding icon
 ├── LICENSE                    # MIT License
@@ -147,7 +218,7 @@ Parto features a normalized, zero-conflict shortcut system registered through `S
 | `F11` | Fullscreen | Toggle fullscreen mode |
 | `Ctrl+Q` | Exit | Safely quit Parto (with unsaved changes prompt) |
 
-### Brush & Painting
+### Brush & Painting (Contextual to Brush Tool)
 | Shortcut | Action | Description |
 | :--- | :--- | :--- |
 | `B` | Brush Tool | Freehand painting on active layer |
@@ -203,19 +274,19 @@ Parto features a normalized, zero-conflict shortcut system registered through `S
 
 ## Testing
 
-Parto includes an automated test suite with **287 tests** covering all image processing routines, brush studio properties, dab generation, presets, layers, command history, dialogs, format conversions, and theme transitions.
+Parto includes a comprehensive automated test suite with **297 tests** covering all image processing routines, document state isolation, transform engines, compositing, storage adapters, brush studio properties, dab generation, presets, layers, command history, dialogs, format conversions, and theme transitions.
 
 Run the test suite using pytest:
 
 ```bash
-pytest
+QT_QPA_PLATFORM=offscreen pytest
 ```
 
 ---
 
 ## Author & Maintainer
 
-- **Author**: Ali Kamrani (علی کامرانی)
+- **Author**: Ali Kamrani (علی کامرانی) / MRThugh
 - **GitHub**: [@MRThugh](https://github.com/MRThugh)
 - **Profile**: [https://github.com/MRThugh](https://github.com/MRThugh)
 - **Repository**: [https://github.com/MRThugh/Parto](https://github.com/MRThugh/Parto)
