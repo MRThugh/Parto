@@ -33,6 +33,8 @@ class DabGenerator:
         """
         flow = getattr(settings, "flow", 1.0)
         is_eraser = getattr(settings, "is_eraser", False)
+        angle = getattr(settings, "angle", 0.0)
+        roundness = getattr(settings, "roundness", 1.0)
         key = (
             settings.size,
             round(settings.hardness, 2),
@@ -40,6 +42,8 @@ class DabGenerator:
             round(flow, 3),
             settings.color,
             is_eraser,
+            round(angle, 1),
+            round(roundness, 2),
         )
 
         if self._cached_dab is not None and self._cached_key == key:
@@ -48,7 +52,18 @@ class DabGenerator:
         D = max(1, settings.size)
         R = D / 2.0
         y, x = np.ogrid[:D, :D]
-        dist = np.hypot(x - (R - 0.5), y - (R - 0.5))
+
+        if roundness >= 0.99 and (abs(angle) < 0.01 or abs(angle - 360.0) < 0.01):
+            dist = np.hypot(x - (R - 0.5), y - (R - 0.5))
+        else:
+            rad = np.radians(angle)
+            cos_a = np.cos(rad)
+            sin_a = np.sin(rad)
+            dx = x - (R - 0.5)
+            dy = y - (R - 0.5)
+            xr = cos_a * dx - sin_a * dy
+            yr = (sin_a * dx + cos_a * dy) / max(0.01, roundness)
+            dist = np.hypot(xr, yr)
 
         inner_r = R * max(0.0, min(1.0, settings.hardness))
         mask = np.zeros((D, D), dtype=np.float32)

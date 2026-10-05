@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.1] - 2026-10-04
 
+### Added
+- **Professional Brush Studio Subsystem (`parto.ui.panels.brush`, `parto.brush`)**:
+  - Full modular studio dock architecture (`BrushStudioDock`) integrating:
+    - **Header Card**: Live dab preview responding in real-time to size, hardness, color, angle, and roundness changes; quick actions menu with preset saving, duplicating, resetting, exporting, and importing.
+    - **Presets Section**: Responsive preset search (`Ctrl+Shift+B`), category filtering (`Basic`, `Pencil`, `Ink`, `Paint`, `Airbrush`, `Marker`, `Texture`, `Eraser`, `Custom`, `★ Favorites`), and visual icon grid (`PresetGridWidget`) with live-rendered dab thumbnails, right-click context menu, and keyboard navigation.
+    - **Tip & Basic Properties**: Synchronized custom sliders and numeric spinboxes for Size (1–500 px), Hardness (0–100%), Spacing (5–200%), Tip Rotation Angle (0–360°), and Tip Roundness (1–100%).
+    - **Color Management**: Interactive foreground and background color chips with standard picker, quick color swap (`X`), color reset (`D`), and 8 curated quick palette swatches with click-to-apply and right-click-to-save.
+    - **Blend & Rendering**: Opacity and Flow percentage controls, blend mode selection (`Normal`, `Multiply`, `Screen`, `Overlay`, `Darken`, `Lighten`), and Paint / Eraser mode toggle (`Shift+B`).
+    - **Brush Dynamics**: Modulation source targeting for Size, Opacity, Flow, and Angle driven by Pressure, Velocity, Tilt, and Random jitter.
+    - **Advanced & Stroke Settings**: Anti-aliased stroke smoothing and scatter jitter controls.
+  - Complete backward-compatibility facade maintaining `BrushDock` and `BrushPanel` exports.
+- **Factory Built-in & Custom Presets**:
+  - 14 factory presets categorized across Basic, Pencil, Ink, Paint, Airbrush, Marker, Texture, and Eraser.
+  - User preset creation, duplication, renaming, deletion, favorite toggling, and single-preset JSON export/import.
+- **Dedicated Brush & Studio Shortcuts**:
+  - `B`: Select Brush Tool.
+  - `[` / `]`: Decrease / increase brush size.
+  - `Shift+[` / `Shift+]`: Decrease / increase brush hardness.
+  - `Ctrl+[` / `Ctrl+]`: Decrease / increase brush opacity.
+  - `Shift+B`: Cycle between Paint and Eraser mode.
+  - `X`: Swap active foreground and background colors.
+  - `D`: Reset brush colors to default black and white.
+  - `F9`: Toggle Brush Studio panel.
+  - `Shift+F9`: Reset all brush parameters to factory defaults.
+  - `Ctrl+Shift+B`: Quick-focus preset search in Brush Studio.
+  - `Alt+B`: Quick-focus tip properties in Brush Studio.
+- **Searchable Shortcuts & Preferences Dialog (`parto.ui.dialogs.shortcuts_dialog`)**:
+  - Full-featured shortcut inspector with real-time category filtering, search, and collision-aware remapping.
+- **Comprehensive Test Suite Expansion**:
+  - Added dedicated unit and UI integration test suites (`test_brush_studio_subsystem.py`, `test_brush_studio_ui.py`) bringing automated test coverage to **287 passed tests**.
+
 ### Fixed
 - **Merge Down & Blend Mode Correctness (`parto.image.layers`)**:
   - Fixed compositing bug where merging an upper layer down into a lower layer with a non-normal blend mode (e.g. `multiply`, `screen`, `overlay`) caused double-blending against underlying background layers.

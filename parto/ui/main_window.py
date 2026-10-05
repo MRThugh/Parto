@@ -250,7 +250,7 @@ class MainWindow(QMainWindow):
         # Docks
         self.toolbar.act_layers_panel = self.toolbar.register_action("layers", "Layers Panel (F7)", "layers")
         self.toolbar.act_adjustments_panel = self.toolbar.register_action("adjust", "Adjustments (F8)", "adjust")
-        self.toolbar.act_brush_panel = self.toolbar.register_action("brush_panel", "Brush Panel (F9)", "brush")
+        self.toolbar.act_brush_panel = self.toolbar.register_action("brush_panel", "Brush Studio (F9)", "brush")
 
         # Retain references for tests and tool switches
         self.tb_tool_move = self.toolbar.act_tool_move
@@ -495,8 +495,8 @@ class MainWindow(QMainWindow):
     def action_tool_move(self):
         self.crop_bar.hide()
         self.brush_bar.hide()
-        if hasattr(self, "brush_dock") and self.brush_dock.isVisible():
-            self.set_brush_dock_visible(False, animate=False)
+        if hasattr(self, "brush_dock"):
+            self.brush_dock.hide()
         self.canvas.set_tool(self.tool_move)
         self.tb_tool_move.setChecked(True)
 
@@ -504,8 +504,8 @@ class MainWindow(QMainWindow):
         if not self.document.has_image:
             return
         self.brush_bar.hide()
-        if hasattr(self, "brush_dock") and self.brush_dock.isVisible():
-            self.set_brush_dock_visible(False, animate=False)
+        if hasattr(self, "brush_dock"):
+            self.brush_dock.hide()
         self.crop_bar.show()
         self.crop_bar.set_dimension_text(f"{self.document.width} × {self.document.height} px")
         self.canvas.set_tool(self.tool_crop)
@@ -528,12 +528,13 @@ class MainWindow(QMainWindow):
     def action_tool_brush(self):
         self.crop_bar.hide()
         self.brush_bar.show()
+        if hasattr(self, "brush_dock"):
+            self.brush_dock.show()
+            self.brush_dock.raise_()
         self.brush_bar.set_size(self.tool_brush.size)
         self.brush_bar.set_opacity(self.tool_brush.opacity)
         self.brush_bar.set_hardness(self.tool_brush.hardness)
         self.brush_bar.set_colors(self.tool_brush.color, self.tool_brush.background_color)
-        if hasattr(self, "set_brush_dock_visible"):
-            self.set_brush_dock_visible(True, animate=False)
         self.canvas.set_tool(self.tool_brush)
         self.tb_tool_brush.setChecked(True)
         self.toast.show_message("Brush Tool active — [ / ] resize, X swap, D reset")
@@ -541,11 +542,42 @@ class MainWindow(QMainWindow):
     def action_tool_eyedropper(self):
         self.crop_bar.hide()
         self.brush_bar.hide()
-        if hasattr(self, "brush_dock") and self.brush_dock.isVisible():
-            self.set_brush_dock_visible(False, animate=False)
+        if hasattr(self, "brush_dock"):
+            self.brush_dock.hide()
         self.canvas.set_tool(self.tool_eyedropper)
         self.tb_tool_eyedropper.setChecked(True)
         self.toast.show_message("Eyedropper active — Click pixel to sample color")
+
+    def action_focus_brush_presets(self):
+        """Focus presets in Brush Studio (Ctrl+Shift+B)."""
+        if hasattr(self, "set_brush_dock_visible") and not self.brush_dock.isVisible():
+            self.set_brush_dock_visible(True, animate=True)
+        if hasattr(self.brush_dock, "focus_search"):
+            self.brush_dock.focus_search()
+
+    def action_focus_brush_properties(self):
+        """Focus tip properties in Brush Studio (Alt+B)."""
+        if hasattr(self, "set_brush_dock_visible") and not self.brush_dock.isVisible():
+            self.set_brush_dock_visible(True, animate=True)
+        if hasattr(self.brush_dock, "focus_properties"):
+            self.brush_dock.focus_properties()
+
+    def action_reset_brush(self):
+        """Reset brush settings to defaults (Shift+F9)."""
+        if hasattr(self.brush_dock, "reset_all_to_defaults"):
+            self.brush_dock.reset_all_to_defaults()
+        elif hasattr(self.tool_brush.settings, "reset_to_defaults"):
+            self.tool_brush.settings.reset_to_defaults()
+        self.toast.show_message("Brush settings reset to defaults")
+
+    def action_cycle_brush_mode(self):
+        """Toggle between Paint and Eraser mode (Shift+B)."""
+        new_mode = not self.tool_brush.is_eraser
+        self.tool_brush.is_eraser = new_mode
+        if hasattr(self, "brush_bar"):
+            self.brush_bar._on_settings_updated()
+        mode_label = "Eraser" if new_mode else "Paint"
+        self.toast.show_message(f"Brush Mode: {mode_label}")
 
     def _on_brush_colors_changed(self, fg: Tuple[int, int, int, int], bg: Tuple[int, int, int, int]):
         self.tool_brush.color = fg

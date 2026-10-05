@@ -83,10 +83,23 @@ class BrushRenderer:
         W, H = target_image.size
         stamped_any = False
 
+        scatter = getattr(settings, "scatter", 0.0)
+        mode_str = (
+            settings.blend_mode.value
+            if hasattr(settings.blend_mode, "value")
+            else str(settings.blend_mode).lower()
+        )
+
         for i in range(num_steps + 1):
             t = float(i) / float(num_steps) if num_steps > 0 else 0.0
             cx = x1 + (x2 - x1) * t
             cy = y1 + (y2 - y1) * t
+
+            if scatter > 0.0:
+                import random
+                offset_mag = R * scatter * 2.0
+                cx += random.uniform(-offset_mag, offset_mag)
+                cy += random.uniform(-offset_mag, offset_mag)
 
             px = int(round(cx - R))
             py = int(round(cy - R))
@@ -118,7 +131,11 @@ class BrushRenderer:
                 stamped_any = True
             else:
                 dest = (px + sx1, py + sy1)
-                target_image.alpha_composite(dab_crop, dest=dest)
+                if mode_str and mode_str != "normal":
+                    from ...image.layers import _blend_mode_composite
+                    _blend_mode_composite(target_image, dab_crop, dest, mode_str)
+                else:
+                    target_image.alpha_composite(dab_crop, dest=dest)
                 stamped_any = True
 
         return stamped_any

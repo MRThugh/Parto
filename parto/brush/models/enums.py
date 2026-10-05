@@ -31,3 +31,26 @@ class PointerType(Enum):
     PEN = "pen"
     ERASER = "eraser"
     TOUCH = "touch"
+
+
+class DynamicsControl(Enum):
+    """Dynamics modulation source for brush parameters."""
+    OFF = "off"
+    PRESSURE = "pressure"
+    TILT = "tilt"
+    VELOCITY = "velocity"
+    RANDOM = "random"
+
+
+class BrushCategory(Enum):
+    """Standard preset categorization."""
+    ALL = "All"
+    BASIC = "Basic"
+    PENCIL = "Pencil"
+    INK = "Ink"
+    PAINT = "Paint"
+    AIRBRUSH = "Airbrush"
+    MARKER = "Marker"
+    TEXTURE = "Texture"
+    ERASER = "Eraser"
+    CUSTOM = "Custom"

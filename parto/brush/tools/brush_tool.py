@@ -119,6 +119,46 @@ class BrushTool:
         self.set_spacing(value)
 
     @property
+    def angle(self) -> float:
+        return getattr(self.settings, "angle", 0.0)
+
+    @angle.setter
+    def angle(self, value: float) -> None:
+        self.set_angle(value)
+
+    @property
+    def roundness(self) -> float:
+        return getattr(self.settings, "roundness", 1.0)
+
+    @roundness.setter
+    def roundness(self, value: float) -> None:
+        self.set_roundness(value)
+
+    @property
+    def smoothing(self) -> float:
+        return getattr(self.settings, "smoothing", 0.0)
+
+    @smoothing.setter
+    def smoothing(self, value: float) -> None:
+        self.set_smoothing(value)
+
+    @property
+    def scatter(self) -> float:
+        return getattr(self.settings, "scatter", 0.0)
+
+    @scatter.setter
+    def scatter(self, value: float) -> None:
+        self.set_scatter(value)
+
+    @property
+    def blend_mode(self) -> Any:
+        return self.settings.blend_mode
+
+    @blend_mode.setter
+    def blend_mode(self, value: Any) -> None:
+        self.settings.blend_mode = value
+
+    @property
     def is_eraser(self) -> bool:
         return self.settings.is_eraser
 
@@ -207,6 +247,24 @@ class BrushTool:
     def set_spacing(self, spacing: float) -> None:
         self.controller.set_spacing(spacing)
 
+    def set_angle(self, angle: float) -> None:
+        self.controller.set_angle(angle)
+
+    def set_roundness(self, roundness: float) -> None:
+        self.controller.set_roundness(roundness)
+
+    def set_smoothing(self, smoothing: float) -> None:
+        self.controller.set_smoothing(smoothing)
+
+    def set_scatter(self, scatter: float) -> None:
+        self.controller.set_scatter(scatter)
+
+    def increase_hardness(self, delta: float = 0.1) -> None:
+        self.controller.set_hardness(self.hardness + delta)
+
+    def decrease_hardness(self, delta: float = 0.1) -> None:
+        self.controller.set_hardness(self.hardness - delta)
+
     def set_is_eraser(self, is_eraser: bool) -> None:
         self.controller.set_is_eraser(is_eraser)
 
@@ -274,15 +332,58 @@ class BrushTool:
 
     def key_press(self, event: QKeyEvent, canvas: Any) -> bool:
         key = event.key()
+        modifiers = event.modifiers()
+        has_ctrl = bool(modifiers & Qt.ControlModifier)
+        has_shift = bool(modifiers & Qt.ShiftModifier)
+
+        # Hardness quick controls: Ctrl + [ / Ctrl + ]
+        if has_ctrl and key == Qt.Key_BracketRight:
+            self.increase_hardness(0.1)
+            self._sync_brush_bar(canvas)
+            return True
+        elif has_ctrl and key == Qt.Key_BracketLeft:
+            self.decrease_hardness(0.1)
+            self._sync_brush_bar(canvas)
+            return True
+
+        # Shift + B: Toggle Eraser Mode
+        if has_shift and key == Qt.Key_B:
+            self.set_is_eraser(not self.is_eraser)
+            self._sync_brush_bar(canvas)
+            return True
+
+        # Size quick controls: [ / ] and Shift + [ / Shift + ]
         if key == Qt.Key_BracketRight:
-            self.increase_size(2)
+            step = 10 if has_shift else 2
+            self.increase_size(step)
             self._sync_brush_bar(canvas)
             return True
         elif key == Qt.Key_BracketLeft:
-            self.decrease_size(2)
+            step = 10 if has_shift else 2
+            self.decrease_size(step)
             self._sync_brush_bar(canvas)
             return True
-        elif key == Qt.Key_X:
+
+        # Numeric keys for fast Opacity adjustment (1 -> 10%, 2 -> 20%, ..., 0 -> 100%)
+        if not has_ctrl and not (modifiers & Qt.AltModifier):
+            number_opacities = {
+                Qt.Key_1: 0.10,
+                Qt.Key_2: 0.20,
+                Qt.Key_3: 0.30,
+                Qt.Key_4: 0.40,
+                Qt.Key_5: 0.50,
+                Qt.Key_6: 0.60,
+                Qt.Key_7: 0.70,
+                Qt.Key_8: 0.80,
+                Qt.Key_9: 0.90,
+                Qt.Key_0: 1.00,
+            }
+            if key in number_opacities:
+                self.set_opacity(number_opacities[key])
+                self._sync_brush_bar(canvas)
+                return True
+
+        if key == Qt.Key_X:
             self.swap_colors()
             self._sync_brush_bar(canvas)
             return True
@@ -290,6 +391,7 @@ class BrushTool:
             self.reset_default_colors()
             self._sync_brush_bar(canvas)
             return True
+
         return False
 
     def mouse_press(self, event: QMouseEvent, scene_pos: QPointF, canvas: Any) -> bool:

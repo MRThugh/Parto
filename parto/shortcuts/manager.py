@@ -45,6 +45,7 @@ class ShortcutManager:
 
     def __init__(self, default_policy: str = "track"):
         self._shortcuts: Dict[str, ShortcutDefinition] = {}
+        self._default_shortcuts: Dict[str, str] = {}
         self.default_policy: str = default_policy
 
     @classmethod
@@ -66,6 +67,8 @@ class ShortcutManager:
         """
         Register or update a shortcut in the registry.
         """
+        if action_id not in self._default_shortcuts:
+            self._default_shortcuts[action_id] = key_sequence
         active_policy = policy or self.default_policy
 
         # Detect conflicts if key_sequence already in use
@@ -225,6 +228,14 @@ class ShortcutManager:
             categories.setdefault(defn.category, []).append(defn)
         return categories
 
+    def categories(self) -> List[str]:
+        """Return unique list of shortcut category names."""
+        return sorted(list(self.get_by_category().keys()))
+
+    def by_category(self, category: str) -> List[ShortcutDefinition]:
+        """Return all shortcut definitions in the specified category."""
+        return self.get_by_category().get(category, [])
+
     def get_action(self, action_id: str) -> Optional[QAction]:
         defn = self._shortcuts.get(action_id)
         return defn.action if defn else None
@@ -232,6 +243,31 @@ class ShortcutManager:
     def get_shortcut_string(self, action_id: str) -> str:
         defn = self._shortcuts.get(action_id)
         return defn.key_sequence if defn else ""
+
+    def get_default_shortcut_string(self, action_id: str) -> str:
+        return self._default_shortcuts.get(action_id, "")
+
+    def find_conflict_for(self, action_id: str, candidate_key: str) -> Optional[ShortcutDefinition]:
+        """Check if candidate_key collides with any other action."""
+        if not candidate_key:
+            return None
+        norm = candidate_key.strip().lower()
+        for existing_id, defn in self._shortcuts.items():
+            if existing_id != action_id and defn.key_sequence and defn.key_sequence.strip().lower() == norm:
+                return defn
+        return None
+
+    def reset_to_defaults(self) -> None:
+        """Reset all shortcuts to their original default bindings."""
+        for action_id, def_key in self._default_shortcuts.items():
+            self.remap_shortcut(action_id, def_key, policy="override")
+
+    def reset_action_to_default(self, action_id: str) -> bool:
+        """Reset a single action to its default shortcut."""
+        if action_id in self._default_shortcuts:
+            def_key = self._default_shortcuts[action_id]
+            return self.remap_shortcut(action_id, def_key, policy="override")
+        return False
 
 
 def get_shortcut_manager() -> ShortcutManager:

@@ -27,6 +27,10 @@ class BrushSettings:
     MAX_HARDNESS: float = 1.0
     MIN_SPACING: float = 0.05
     MAX_SPACING: float = 2.0
+    MIN_ANGLE: float = 0.0
+    MAX_ANGLE: float = 360.0
+    MIN_ROUNDNESS: float = 0.01
+    MAX_ROUNDNESS: float = 1.0
 
     def __init__(
         self,
@@ -39,6 +43,16 @@ class BrushSettings:
         spacing: float = 0.25,
         is_eraser: bool = False,
         blend_mode: BlendMode | str = BlendMode.NORMAL,
+        angle: float = 0.0,
+        roundness: float = 1.0,
+        smoothing: float = 0.0,
+        scatter: float = 0.0,
+        size_jitter: float = 0.0,
+        angle_jitter: float = 0.0,
+        dynamics_size: str = "off",
+        dynamics_opacity: str = "off",
+        dynamics_flow: str = "off",
+        dynamics_angle: str = "off",
     ):
         self._size: int = self._clamp_int(size, self.MIN_SIZE, self.MAX_SIZE)
         self._opacity: float = self._clamp_float(opacity, self.MIN_OPACITY, self.MAX_OPACITY)
@@ -51,6 +65,16 @@ class BrushSettings:
         self._blend_mode: BlendMode = (
             blend_mode if isinstance(blend_mode, BlendMode) else BlendMode(str(blend_mode).lower())
         )
+        self._angle: float = float(angle) % 360.0
+        self._roundness: float = self._clamp_float(roundness, self.MIN_ROUNDNESS, self.MAX_ROUNDNESS)
+        self._smoothing: float = self._clamp_float(smoothing, 0.0, 1.0)
+        self._scatter: float = self._clamp_float(scatter, 0.0, 1.0)
+        self._size_jitter: float = self._clamp_float(size_jitter, 0.0, 1.0)
+        self._angle_jitter: float = self._clamp_float(angle_jitter, 0.0, 1.0)
+        self._dynamics_size: str = str(dynamics_size).lower()
+        self._dynamics_opacity: str = str(dynamics_opacity).lower()
+        self._dynamics_flow: str = str(dynamics_flow).lower()
+        self._dynamics_angle: str = str(dynamics_angle).lower()
         self._listeners: List[Callable[[], None]] = []
 
     # --- Validation Utilities ---
@@ -235,6 +259,146 @@ class BrushSettings:
             self._blend_mode = new_mode
             self.notify_changed()
 
+    @property
+    def angle(self) -> float:
+        return self._angle
+
+    @angle.setter
+    def angle(self, val: float) -> None:
+        self.set_angle(val)
+
+    def set_angle(self, angle: float) -> None:
+        clamped = float(angle) % 360.0
+        if abs(self._angle - clamped) > 1e-4:
+            self._angle = clamped
+            self.notify_changed()
+
+    @property
+    def roundness(self) -> float:
+        return self._roundness
+
+    @roundness.setter
+    def roundness(self, val: float) -> None:
+        self.set_roundness(val)
+
+    def set_roundness(self, roundness: float) -> None:
+        clamped = self._clamp_float(roundness, self.MIN_ROUNDNESS, self.MAX_ROUNDNESS)
+        if abs(self._roundness - clamped) > 1e-4:
+            self._roundness = clamped
+            self.notify_changed()
+
+    @property
+    def smoothing(self) -> float:
+        return self._smoothing
+
+    @smoothing.setter
+    def smoothing(self, val: float) -> None:
+        self.set_smoothing(val)
+
+    def set_smoothing(self, smoothing: float) -> None:
+        clamped = self._clamp_float(smoothing, 0.0, 1.0)
+        if abs(self._smoothing - clamped) > 1e-4:
+            self._smoothing = clamped
+            self.notify_changed()
+
+    @property
+    def scatter(self) -> float:
+        return self._scatter
+
+    @scatter.setter
+    def scatter(self, val: float) -> None:
+        self.set_scatter(val)
+
+    def set_scatter(self, scatter: float) -> None:
+        clamped = self._clamp_float(scatter, 0.0, 1.0)
+        if abs(self._scatter - clamped) > 1e-4:
+            self._scatter = clamped
+            self.notify_changed()
+
+    @property
+    def size_jitter(self) -> float:
+        return self._size_jitter
+
+    @size_jitter.setter
+    def size_jitter(self, val: float) -> None:
+        self.set_size_jitter(val)
+
+    def set_size_jitter(self, val: float) -> None:
+        clamped = self._clamp_float(val, 0.0, 1.0)
+        if abs(self._size_jitter - clamped) > 1e-4:
+            self._size_jitter = clamped
+            self.notify_changed()
+
+    @property
+    def angle_jitter(self) -> float:
+        return self._angle_jitter
+
+    @angle_jitter.setter
+    def angle_jitter(self, val: float) -> None:
+        self.set_angle_jitter(val)
+
+    def set_angle_jitter(self, val: float) -> None:
+        clamped = self._clamp_float(val, 0.0, 1.0)
+        if abs(self._angle_jitter - clamped) > 1e-4:
+            self._angle_jitter = clamped
+            self.notify_changed()
+
+    @property
+    def dynamics_size(self) -> str:
+        return self._dynamics_size
+
+    @dynamics_size.setter
+    def dynamics_size(self, val: str) -> None:
+        self.set_dynamics_size(val)
+
+    def set_dynamics_size(self, val: str) -> None:
+        v = str(val).lower()
+        if self._dynamics_size != v:
+            self._dynamics_size = v
+            self.notify_changed()
+
+    @property
+    def dynamics_opacity(self) -> str:
+        return self._dynamics_opacity
+
+    @dynamics_opacity.setter
+    def dynamics_opacity(self, val: str) -> None:
+        self.set_dynamics_opacity(val)
+
+    def set_dynamics_opacity(self, val: str) -> None:
+        v = str(val).lower()
+        if self._dynamics_opacity != v:
+            self._dynamics_opacity = v
+            self.notify_changed()
+
+    @property
+    def dynamics_flow(self) -> str:
+        return self._dynamics_flow
+
+    @dynamics_flow.setter
+    def dynamics_flow(self, val: str) -> None:
+        self.set_dynamics_flow(val)
+
+    def set_dynamics_flow(self, val: str) -> None:
+        v = str(val).lower()
+        if self._dynamics_flow != v:
+            self._dynamics_flow = v
+            self.notify_changed()
+
+    @property
+    def dynamics_angle(self) -> str:
+        return self._dynamics_angle
+
+    @dynamics_angle.setter
+    def dynamics_angle(self, val: str) -> None:
+        self.set_dynamics_angle(val)
+
+    def set_dynamics_angle(self, val: str) -> None:
+        v = str(val).lower()
+        if self._dynamics_angle != v:
+            self._dynamics_angle = v
+            self.notify_changed()
+
     # --- Convenience Operations ---
 
     def increase_size(self, delta: int = 2) -> None:
@@ -256,6 +420,29 @@ class BrushSettings:
         self._background_color = (255, 255, 255, 255)
         self.notify_changed()
 
+    def reset_to_defaults(self) -> None:
+        """Reset all parameters to standard basic defaults."""
+        self._size = 8
+        self._opacity = 1.0
+        self._flow = 1.0
+        self._hardness = 0.8
+        self._spacing = 0.25
+        self._is_eraser = False
+        self._blend_mode = BlendMode.NORMAL
+        self._angle = 0.0
+        self._roundness = 1.0
+        self._smoothing = 0.0
+        self._scatter = 0.0
+        self._size_jitter = 0.0
+        self._angle_jitter = 0.0
+        self._dynamics_size = "off"
+        self._dynamics_opacity = "off"
+        self._dynamics_flow = "off"
+        self._dynamics_angle = "off"
+        self._color = (0, 0, 0, 255)
+        self._background_color = (255, 255, 255, 255)
+        self.notify_changed()
+
     # --- Serialization ---
 
     def to_dict(self) -> Dict[str, Any]:
@@ -270,6 +457,16 @@ class BrushSettings:
             "background_color": list(self._background_color),
             "is_eraser": self._is_eraser,
             "blend_mode": self._blend_mode.value,
+            "angle": self._angle,
+            "roundness": self._roundness,
+            "smoothing": self._smoothing,
+            "scatter": self._scatter,
+            "size_jitter": self._size_jitter,
+            "angle_jitter": self._angle_jitter,
+            "dynamics_size": self._dynamics_size,
+            "dynamics_opacity": self._dynamics_opacity,
+            "dynamics_flow": self._dynamics_flow,
+            "dynamics_angle": self._dynamics_angle,
         }
 
     @classmethod
@@ -285,6 +482,16 @@ class BrushSettings:
             background_color=tuple(data.get("background_color", [255, 255, 255, 255])),
             is_eraser=data.get("is_eraser", False),
             blend_mode=data.get("blend_mode", BlendMode.NORMAL.value),
+            angle=data.get("angle", 0.0),
+            roundness=data.get("roundness", 1.0),
+            smoothing=data.get("smoothing", 0.0),
+            scatter=data.get("scatter", 0.0),
+            size_jitter=data.get("size_jitter", 0.0),
+            angle_jitter=data.get("angle_jitter", 0.0),
+            dynamics_size=data.get("dynamics_size", "off"),
+            dynamics_opacity=data.get("dynamics_opacity", "off"),
+            dynamics_flow=data.get("dynamics_flow", "off"),
+            dynamics_angle=data.get("dynamics_angle", "off"),
         )
 
     def copy(self) -> BrushSettings:
@@ -299,4 +506,14 @@ class BrushSettings:
             spacing=self._spacing,
             is_eraser=self._is_eraser,
             blend_mode=self._blend_mode,
+            angle=self._angle,
+            roundness=self._roundness,
+            smoothing=self._smoothing,
+            scatter=self._scatter,
+            size_jitter=self._size_jitter,
+            angle_jitter=self._angle_jitter,
+            dynamics_size=self._dynamics_size,
+            dynamics_opacity=self._dynamics_opacity,
+            dynamics_flow=self._dynamics_flow,
+            dynamics_angle=self._dynamics_angle,
         )
