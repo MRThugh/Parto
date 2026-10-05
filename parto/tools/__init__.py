@@ -4,7 +4,7 @@
 from .base import BaseTool
 from .move import MoveTool
 from .crop import CropTool
-from .brush import BrushTool
+from .brush import BrushTool, BrushSettings, BrushPreset, BrushPresetManager
 from .eyedropper import EyedropperTool
 
 __all__ = [
@@ -12,5 +12,8 @@ __all__ = [
     "MoveTool",
     "CropTool",
     "BrushTool",
+    "BrushSettings",
+    "BrushPreset",
+    "BrushPresetManager",
     "EyedropperTool",
 ]

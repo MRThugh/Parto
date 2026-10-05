@@ -29,7 +29,6 @@ from PySide6.QtWidgets import (
 from .document import Document
 from ..tools.base import BaseTool
 from ..tools.move import MoveTool
-from ..tools.crop import CropTool
 from ..utils.conversions import pil_to_qpixmap
 from ..themes.manager import get_theme_manager
 
@@ -105,16 +104,19 @@ class Canvas(QGraphicsView):
 
     @property
     def crop_mode(self) -> bool:
+        from ..tools.crop import CropTool
         return isinstance(self.active_tool, CropTool)
 
     @property
     def crop_aspect_ratio(self) -> Optional[float]:
+        from ..tools.crop import CropTool
         if isinstance(self.active_tool, CropTool):
             return self.active_tool.selection.aspect_ratio
         return None
 
     def set_crop_mode(self, enabled: bool, aspect_ratio: Optional[float] = None) -> None:
         """Compatibility method to enable or disable crop mode."""
+        from ..tools.crop import CropTool
         if enabled:
             if not isinstance(self.active_tool, CropTool):
                 crop_tool = CropTool()

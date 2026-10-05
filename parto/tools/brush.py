@@ -9,12 +9,18 @@ Author: Ali Kamrani (MRThugh)
 
 from __future__ import annotations
 import math
-from typing import Any, Optional, Tuple
+import os
+import json
+import logging
+from dataclasses import dataclass
+from typing import Any, Optional, Tuple, List, Dict, Callable
 from PIL import Image
 import numpy as np
-from PySide6.QtCore import Qt, QPointF
+from PySide6.QtCore import Qt, QPointF, QStandardPaths
 from PySide6.QtGui import QMouseEvent, QKeyEvent
 from .base import BaseTool
+
+logger = logging.getLogger("parto.tools.brush")
 
 
 class BrushSettings:
@@ -30,12 +36,34 @@ class BrushSettings:
         hardness: float = 0.8,
         color: Tuple[int, int, int, int] = (0, 0, 0, 255),
         background_color: Tuple[int, int, int, int] = (255, 255, 255, 255),
+        flow: float = 1.0,
+        spacing: float = 0.25,
+        is_eraser: bool = False,
     ):
         self.size: int = max(1, min(500, int(size)))
         self.opacity: float = max(0.0, min(1.0, float(opacity)))
         self.hardness: float = max(0.0, min(1.0, float(hardness)))
         self.color: Tuple[int, int, int, int] = color
         self.background_color: Tuple[int, int, int, int] = background_color
+        self.flow: float = max(0.0, min(1.0, float(flow)))
+        self.spacing: float = max(0.05, min(2.0, float(spacing)))
+        self.is_eraser: bool = bool(is_eraser)
+        self._listeners: List[Callable[[], None]] = []
+
+    def add_listener(self, callback: Callable[[], None]) -> None:
+        if callback not in self._listeners:
+            self._listeners.append(callback)
+
+    def remove_listener(self, callback: Callable[[], None]) -> None:
+        if callback in self._listeners:
+            self._listeners.remove(callback)
+
+    def notify_changed(self) -> None:
+        for cb in list(self._listeners):
+            try:
+                cb()
+            except Exception:
+                pass
 
     @property
     def radius(self) -> int:
@@ -43,22 +71,53 @@ class BrushSettings:
 
     @radius.setter
     def radius(self, value: int):
-        self.size = max(1, min(500, int(value) * 2))
+        self.set_size(max(1, min(500, int(value) * 2)))
 
     def set_size(self, size: int) -> None:
-        self.size = max(1, min(500, int(size)))
+        clamped = max(1, min(500, int(size)))
+        if self.size != clamped:
+            self.size = clamped
+            self.notify_changed()
 
     def set_opacity(self, opacity: float) -> None:
-        self.opacity = max(0.0, min(1.0, float(opacity)))
+        clamped = max(0.0, min(1.0, float(opacity)))
+        if self.opacity != clamped:
+            self.opacity = clamped
+            self.notify_changed()
 
     def set_hardness(self, hardness: float) -> None:
-        self.hardness = max(0.0, min(1.0, float(hardness)))
+        clamped = max(0.0, min(1.0, float(hardness)))
+        if self.hardness != clamped:
+            self.hardness = clamped
+            self.notify_changed()
+
+    def set_flow(self, flow: float) -> None:
+        clamped = max(0.0, min(1.0, float(flow)))
+        if self.flow != clamped:
+            self.flow = clamped
+            self.notify_changed()
+
+    def set_spacing(self, spacing: float) -> None:
+        clamped = max(0.05, min(2.0, float(spacing)))
+        if self.spacing != clamped:
+            self.spacing = clamped
+            self.notify_changed()
+
+    def set_is_eraser(self, is_eraser: bool) -> None:
+        b = bool(is_eraser)
+        if self.is_eraser != b:
+            self.is_eraser = b
+            self.notify_changed()
 
     def set_color(self, color: Tuple[int, int, int, int]) -> None:
-        self.color = color
+        if self.color != color:
+            self.color = color
+            self.notify_changed()
 
     def set_background_color(self, color: Tuple[int, int, int, int]) -> None:
-        self.background_color = color
+        if self.background_color != color:
+            self.background_color = color
+            self.notify_changed()
 
     def increase_size(self, delta: int = 2) -> None:
         self.set_size(self.size + delta)
@@ -68,10 +127,12 @@ class BrushSettings:
 
     def swap_colors(self) -> None:
         self.color, self.background_color = self.background_color, self.color
+        self.notify_changed()
 
     def reset_default_colors(self) -> None:
         self.color = (0, 0, 0, 255)
         self.background_color = (255, 255, 255, 255)
+        self.notify_changed()
 
 
 class BrushRenderer:
@@ -81,7 +142,7 @@ class BrushRenderer:
 
     def __init__(self):
         self._cached_dab: Optional[Image.Image] = None
-        self._cached_dab_key: Optional[Tuple[int, float, float, Tuple[int, int, int, int]]] = None
+        self._cached_dab_key: Optional[Tuple[Any, ...]] = None
 
     def invalidate_cache(self) -> None:
         self._cached_dab = None
@@ -91,7 +152,16 @@ class BrushRenderer:
         """
         Generate or retrieve a cached circular brush dab with radial hardness falloff.
         """
-        key = (settings.size, round(settings.hardness, 2), round(settings.opacity, 3), settings.color)
+        flow = getattr(settings, "flow", 1.0)
+        is_eraser = getattr(settings, "is_eraser", False)
+        key = (
+            settings.size,
+            round(settings.hardness, 2),
+            round(settings.opacity, 3),
+            round(flow, 3),
+            settings.color,
+            is_eraser,
+        )
         if self._cached_dab is not None and self._cached_dab_key == key:
             return self._cached_dab
 
@@ -110,7 +180,7 @@ class BrushRenderer:
             falloff = (dist > inner_r) & (dist <= R)
             mask[falloff] = 1.0 - (dist[falloff] - inner_r) / (R - inner_r)
 
-        effective_alpha = settings.color[3] * settings.opacity
+        effective_alpha = settings.color[3] * settings.opacity * flow
         alpha_channel = (mask * effective_alpha).clip(0, 255).astype(np.uint8)
 
         dab_arr = np.zeros((D, D, 4), dtype=np.uint8)
@@ -136,7 +206,12 @@ class BrushRenderer:
         Interpolate and stamp dabs along the path between (x1, y1) and (x2, y2).
         Returns True if any dab was stamped within target image bounds.
         """
-        if settings.opacity <= 0.0 or settings.size <= 0 or settings.color[3] <= 0:
+        if settings.opacity <= 0.0 or settings.size <= 0:
+            return False
+        if getattr(settings, "flow", 1.0) <= 0.0:
+            return False
+        is_eraser = getattr(settings, "is_eraser", False)
+        if not is_eraser and settings.color[3] <= 0:
             return False
 
         dab = self.get_dab(settings)
@@ -144,7 +219,8 @@ class BrushRenderer:
         R = D / 2.0
 
         dist = math.hypot(x2 - x1, y2 - y1)
-        step = max(1.0, R * 0.25)
+        spacing = getattr(settings, "spacing", 0.25)
+        step = max(1.0, R * max(0.05, spacing * 2.0))
         num_steps = max(1, int(math.ceil(dist / step)))
 
         W, H = target_image.size
@@ -169,10 +245,24 @@ class BrushRenderer:
             if sx2 <= sx1 or sy2 <= sy1:
                 continue
 
+            dest_box = (px + sx1, py + sy1, px + sx2, py + sy2)
             dab_crop = dab.crop((sx1, sy1, sx2, sy2))
-            dest = (px + sx1, py + sy1)
-            target_image.alpha_composite(dab_crop, dest=dest)
-            stamped_any = True
+
+            if is_eraser:
+                dest_crop = target_image.crop(dest_box)
+                dest_arr = np.array(dest_crop)
+                dab_arr = np.array(dab_crop)
+                dab_alpha = dab_arr[:, :, 3].astype(np.float32) / 255.0
+                dest_arr[:, :, 3] = (
+                    dest_arr[:, :, 3].astype(np.float32) * (1.0 - dab_alpha)
+                ).clip(0, 255).astype(np.uint8)
+                erased_patch = Image.fromarray(dest_arr, mode="RGBA")
+                target_image.paste(erased_patch, (px + sx1, py + sy1))
+                stamped_any = True
+            else:
+                dest = (px + sx1, py + sy1)
+                target_image.alpha_composite(dab_crop, dest=dest)
+                stamped_any = True
 
         return stamped_any
 
@@ -427,6 +517,30 @@ class BrushTool(BaseTool):
         self.settings.set_hardness(value)
 
     @property
+    def flow(self) -> float:
+        return self.settings.flow
+
+    @flow.setter
+    def flow(self, value: float) -> None:
+        self.settings.set_flow(value)
+
+    @property
+    def spacing(self) -> float:
+        return self.settings.spacing
+
+    @spacing.setter
+    def spacing(self, value: float) -> None:
+        self.settings.set_spacing(value)
+
+    @property
+    def is_eraser(self) -> bool:
+        return self.settings.is_eraser
+
+    @is_eraser.setter
+    def is_eraser(self, value: bool) -> None:
+        self.settings.set_is_eraser(value)
+
+    @property
     def radius(self) -> int:
         return self.settings.radius
 
@@ -501,6 +615,17 @@ class BrushTool(BaseTool):
 
     def set_hardness(self, hardness: float) -> None:
         self.settings.set_hardness(hardness)
+        self.renderer.invalidate_cache()
+
+    def set_flow(self, flow: float) -> None:
+        self.settings.set_flow(flow)
+        self.renderer.invalidate_cache()
+
+    def set_spacing(self, spacing: float) -> None:
+        self.settings.set_spacing(spacing)
+
+    def set_is_eraser(self, is_eraser: bool) -> None:
+        self.settings.set_is_eraser(is_eraser)
         self.renderer.invalidate_cache()
 
     def increase_size(self, delta: int = 2) -> None:
@@ -621,3 +746,200 @@ class BrushTool(BaseTool):
                 canvas.update_composite_pixmap()
             return True
         return False
+
+
+def get_default_presets_path() -> str:
+    """Return default filesystem location for user brush presets."""
+    try:
+        base = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
+    except Exception:
+        base = ""
+    if not base:
+        base = os.path.expanduser("~/.parto")
+    return os.path.join(base, "brush_presets.json")
+
+
+@dataclass
+class BrushPreset:
+    """
+    Data model representing a brush preset configuration.
+    """
+    name: str
+    size: int = 12
+    opacity: float = 1.0
+    flow: float = 1.0
+    hardness: float = 0.8
+    spacing: float = 0.25
+    is_eraser: bool = False
+    is_builtin: bool = False
+    description: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "size": self.size,
+            "opacity": self.opacity,
+            "flow": self.flow,
+            "hardness": self.hardness,
+            "spacing": self.spacing,
+            "is_eraser": self.is_eraser,
+            "description": self.description,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any], is_builtin: bool = False) -> BrushPreset:
+        return cls(
+            name=str(data.get("name", "Custom")),
+            size=int(data.get("size", 12)),
+            opacity=float(data.get("opacity", 1.0)),
+            flow=float(data.get("flow", 1.0)),
+            hardness=float(data.get("hardness", 0.8)),
+            spacing=float(data.get("spacing", 0.25)),
+            is_eraser=bool(data.get("is_eraser", False)),
+            is_builtin=is_builtin,
+            description=str(data.get("description", "")),
+        )
+
+    def apply_to(self, settings: BrushSettings) -> None:
+        """Apply preset properties to the authoritative BrushSettings."""
+        settings.size = max(1, min(500, int(self.size)))
+        settings.opacity = max(0.0, min(1.0, float(self.opacity)))
+        settings.flow = max(0.0, min(1.0, float(self.flow)))
+        settings.hardness = max(0.0, min(1.0, float(self.hardness)))
+        settings.spacing = max(0.05, min(2.0, float(self.spacing)))
+        settings.is_eraser = bool(self.is_eraser)
+        settings.notify_changed()
+
+
+class BrushPresetManager:
+    """
+    Coordinates built-in and user-defined brush presets.
+    Guarantees built-in immutability and safe user persistence.
+    """
+
+    def __init__(self, storage_path: Optional[str] = None):
+        self.storage_path: str = storage_path or get_default_presets_path()
+        self._builtin_presets: List[BrushPreset] = []
+        self._user_presets: List[BrushPreset] = []
+        self._active_preset_name: Optional[str] = "Basic Round"
+        self._init_builtins()
+        self.load_user_presets()
+
+    def _init_builtins(self) -> None:
+        self._builtin_presets = [
+            BrushPreset("Basic Round", size=12, opacity=1.0, flow=1.0, hardness=0.8, spacing=0.25, is_eraser=False, is_builtin=True, description="Standard general-purpose brush"),
+            BrushPreset("Soft Round", size=24, opacity=0.8, flow=0.8, hardness=0.15, spacing=0.20, is_eraser=False, is_builtin=True, description="Soft feathered edges for blending"),
+            BrushPreset("Hard Round", size=16, opacity=1.0, flow=1.0, hardness=1.0, spacing=0.20, is_eraser=False, is_builtin=True, description="Crisp, sharp solid round brush"),
+            BrushPreset("Pencil", size=2, opacity=0.95, flow=1.0, hardness=0.95, spacing=0.15, is_eraser=False, is_builtin=True, description="Fine line sketching tool"),
+            BrushPreset("Ink", size=6, opacity=1.0, flow=1.0, hardness=0.9, spacing=0.10, is_eraser=False, is_builtin=True, description="Fluid continuous inking line"),
+            BrushPreset("Marker", size=22, opacity=0.55, flow=0.75, hardness=0.7, spacing=0.18, is_eraser=False, is_builtin=True, description="Semi-transparent layering marker"),
+            BrushPreset("Airbrush", size=40, opacity=0.35, flow=0.45, hardness=0.02, spacing=0.15, is_eraser=False, is_builtin=True, description="Diffuse soft aerosol spray"),
+            BrushPreset("Eraser", size=20, opacity=1.0, flow=1.0, hardness=0.85, spacing=0.20, is_eraser=True, is_builtin=True, description="Erases pixels from the active layer"),
+        ]
+
+    def get_all_presets(self) -> List[BrushPreset]:
+        return list(self._builtin_presets) + list(self._user_presets)
+
+    def get_builtin_presets(self) -> List[BrushPreset]:
+        return list(self._builtin_presets)
+
+    def get_user_presets(self) -> List[BrushPreset]:
+        return list(self._user_presets)
+
+    def get_preset(self, name: str) -> Optional[BrushPreset]:
+        target = name.strip().lower()
+        for p in self.get_all_presets():
+            if p.name.strip().lower() == target:
+                return p
+        return None
+
+    @property
+    def active_preset_name(self) -> Optional[str]:
+        return self._active_preset_name
+
+    @active_preset_name.setter
+    def active_preset_name(self, name: Optional[str]) -> None:
+        self._active_preset_name = name
+
+    def apply_preset(self, name: str, settings: BrushSettings) -> bool:
+        preset = self.get_preset(name)
+        if preset:
+            preset.apply_to(settings)
+            self._active_preset_name = preset.name
+            return True
+        return False
+
+    def create_user_preset(
+        self,
+        name: str,
+        settings: BrushSettings,
+        description: str = "",
+    ) -> BrushPreset:
+        clean_name = name.strip()
+        if not clean_name:
+            clean_name = f"Custom {len(self._user_presets) + 1}"
+
+        for b in self._builtin_presets:
+            if b.name.lower() == clean_name.lower():
+                clean_name = f"{clean_name} (User)"
+                break
+
+        self._user_presets = [p for p in self._user_presets if p.name.lower() != clean_name.lower()]
+
+        preset = BrushPreset(
+            name=clean_name,
+            size=settings.size,
+            opacity=settings.opacity,
+            flow=getattr(settings, "flow", 1.0),
+            hardness=settings.hardness,
+            spacing=getattr(settings, "spacing", 0.25),
+            is_eraser=getattr(settings, "is_eraser", False),
+            is_builtin=False,
+            description=description,
+        )
+        self._user_presets.append(preset)
+        self._active_preset_name = preset.name
+        self.save_user_presets()
+        return preset
+
+    def delete_user_preset(self, name: str) -> bool:
+        clean_name = name.strip().lower()
+        for b in self._builtin_presets:
+            if b.name.strip().lower() == clean_name:
+                return False
+
+        before_len = len(self._user_presets)
+        self._user_presets = [p for p in self._user_presets if p.name.strip().lower() != clean_name]
+        if len(self._user_presets) < before_len:
+            if self._active_preset_name and self._active_preset_name.strip().lower() == clean_name:
+                self._active_preset_name = "Basic Round"
+            self.save_user_presets()
+            return True
+        return False
+
+    def save_user_presets(self) -> None:
+        try:
+            folder = os.path.dirname(self.storage_path)
+            if folder:
+                os.makedirs(folder, exist_ok=True)
+            data = [p.to_dict() for p in self._user_presets]
+            with open(self.storage_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            logger.warning(f"Could not persist user brush presets: {e}")
+
+    def load_user_presets(self) -> None:
+        if not os.path.exists(self.storage_path):
+            return
+        try:
+            with open(self.storage_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                self._user_presets = [
+                    BrushPreset.from_dict(item, is_builtin=False)
+                    for item in data
+                    if isinstance(item, dict) and "name" in item
+                ]
+        except Exception as e:
+            logger.warning(f"Could not load user brush presets: {e}")
+

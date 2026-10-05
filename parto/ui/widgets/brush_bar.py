@@ -316,7 +316,7 @@ class BrushBar(QWidget):
         self.spin_size.setRange(1, 500)
         self.spin_size.setValue(8)
         self.spin_size.setSuffix(" px")
-        self.spin_size.setFixedWidth(70)
+        self.spin_size.setFixedWidth(76)
         self.spin_size.setAlignment(Qt.AlignRight)
         size_layout.addWidget(self.spin_size)
 
@@ -347,7 +347,7 @@ class BrushBar(QWidget):
         self.spin_opacity.setRange(1, 100)
         self.spin_opacity.setValue(100)
         self.spin_opacity.setSuffix(" %")
-        self.spin_opacity.setFixedWidth(70)
+        self.spin_opacity.setFixedWidth(76)
         self.spin_opacity.setAlignment(Qt.AlignRight)
         dynamics_layout.addWidget(self.spin_opacity)
 
@@ -371,7 +371,7 @@ class BrushBar(QWidget):
         self.spin_hardness.setRange(0, 100)
         self.spin_hardness.setValue(80)
         self.spin_hardness.setSuffix(" %")
-        self.spin_hardness.setFixedWidth(70)
+        self.spin_hardness.setFixedWidth(76)
         self.spin_hardness.setAlignment(Qt.AlignRight)
         dynamics_layout.addWidget(self.spin_hardness)
 
@@ -381,6 +381,22 @@ class BrushBar(QWidget):
         layout.addLayout(dynamics_layout)
 
     # --- Value Synchronization Handlers ---
+
+    def bind_settings(self, settings: Any) -> None:
+        """Bind BrushBar to the authoritative BrushSettings instance."""
+        self._settings = settings
+        if hasattr(settings, "add_listener"):
+            settings.add_listener(self._on_settings_updated)
+        self._on_settings_updated()
+
+    def _on_settings_updated(self) -> None:
+        if not hasattr(self, "_settings") or self._settings is None:
+            return
+        s = self._settings
+        self.set_size(s.size)
+        self.set_opacity(s.opacity)
+        self.set_hardness(s.hardness)
+        self.set_colors(s.color, s.background_color)
 
     def _sync_preview(self) -> None:
         self.preview.update_preview(
@@ -395,6 +411,8 @@ class BrushBar(QWidget):
         self.spin_size.setValue(val)
         self.spin_size.blockSignals(False)
         self._sync_preview()
+        if hasattr(self, "_settings") and self._settings is not None and self._settings.size != val:
+            self._settings.set_size(val)
         self.size_changed.emit(val)
 
     def _on_size_spin_changed(self, val: int) -> None:
@@ -402,6 +420,8 @@ class BrushBar(QWidget):
         self.slider_size.setValue(val)
         self.slider_size.blockSignals(False)
         self._sync_preview()
+        if hasattr(self, "_settings") and self._settings is not None and self._settings.size != val:
+            self._settings.set_size(val)
         self.size_changed.emit(val)
 
     def _on_opacity_slider_changed(self, val: int) -> None:
@@ -409,28 +429,40 @@ class BrushBar(QWidget):
         self.spin_opacity.setValue(val)
         self.spin_opacity.blockSignals(False)
         self._sync_preview()
-        self.opacity_changed.emit(val / 100.0)
+        new_op = val / 100.0
+        if hasattr(self, "_settings") and self._settings is not None and abs(self._settings.opacity - new_op) > 0.001:
+            self._settings.set_opacity(new_op)
+        self.opacity_changed.emit(new_op)
 
     def _on_opacity_spin_changed(self, val: int) -> None:
         self.slider_opacity.blockSignals(True)
         self.slider_opacity.setValue(val)
         self.slider_opacity.blockSignals(False)
         self._sync_preview()
-        self.opacity_changed.emit(val / 100.0)
+        new_op = val / 100.0
+        if hasattr(self, "_settings") and self._settings is not None and abs(self._settings.opacity - new_op) > 0.001:
+            self._settings.set_opacity(new_op)
+        self.opacity_changed.emit(new_op)
 
     def _on_hardness_slider_changed(self, val: int) -> None:
         self.spin_hardness.blockSignals(True)
         self.spin_hardness.setValue(val)
         self.spin_hardness.blockSignals(False)
         self._sync_preview()
-        self.hardness_changed.emit(val / 100.0)
+        new_hard = val / 100.0
+        if hasattr(self, "_settings") and self._settings is not None and abs(self._settings.hardness - new_hard) > 0.001:
+            self._settings.set_hardness(new_hard)
+        self.hardness_changed.emit(new_hard)
 
     def _on_hardness_spin_changed(self, val: int) -> None:
         self.slider_hardness.blockSignals(True)
         self.slider_hardness.setValue(val)
         self.slider_hardness.blockSignals(False)
         self._sync_preview()
-        self.hardness_changed.emit(val / 100.0)
+        new_hard = val / 100.0
+        if hasattr(self, "_settings") and self._settings is not None and abs(self._settings.hardness - new_hard) > 0.001:
+            self._settings.set_hardness(new_hard)
+        self.hardness_changed.emit(new_hard)
 
     # --- Color Interactions ---
 
@@ -555,17 +587,6 @@ class BrushBar(QWidget):
             }}
             QLabel {{
                 color: {text};
-            }}
-            QSpinBox {{
-                background-color: {sunken};
-                color: {text};
-                border: 1px solid {border};
-                border-radius: 4px;
-                padding: 2px 4px;
-                font-size: 11px;
-            }}
-            QSpinBox:focus {{
-                border: 1px solid {primary};
             }}
             QToolButton {{
                 background-color: transparent;

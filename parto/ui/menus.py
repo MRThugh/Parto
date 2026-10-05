@@ -142,6 +142,27 @@ class EditorMenuBar:
 
             window.adjustments_dock.visibilityChanged.connect(_sync_adj_action)
 
+        if hasattr(window, "brush_dock"):
+            act_tbrush = sm.register("view_brush", "Brush Panel", "View", "F9", "Toggle Brush Settings & Presets Panel", view_menu.addAction("Brush Panel"))
+            act_tbrush.action.setCheckable(True)
+            act_tbrush.action.setChecked(window.brush_dock.isVisible())
+            if hasattr(window, "set_brush_dock_visible"):
+                act_tbrush.action.toggled.connect(lambda checked: window.set_brush_dock_visible(checked, animate=True))
+            else:
+                act_tbrush.action.toggled.connect(window.brush_dock.setVisible)
+
+            def _sync_brush_action(vis: bool):
+                try:
+                    action = act_tbrush.action
+                    if action is not None and action.isChecked() != vis:
+                        action.blockSignals(True)
+                        action.setChecked(vis)
+                        action.blockSignals(False)
+                except (RuntimeError, AttributeError):
+                    pass
+
+            window.brush_dock.visibilityChanged.connect(_sync_brush_action)
+
         # ==========================================
         # 4. IMAGE MENU
         # ==========================================

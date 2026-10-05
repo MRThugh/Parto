@@ -3,5 +3,6 @@
 
 from .adjustments import AdjustmentDock
 from .layers_panel import LayersDock
+from .brush_panel import BrushDock, BrushPanel
 
-__all__ = ["AdjustmentDock", "LayersDock"]
+__all__ = ["AdjustmentDock", "LayersDock", "BrushDock", "BrushPanel"]

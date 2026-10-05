@@ -4,7 +4,52 @@ Parto v0.3.0 - Theme Palettes and Dynamic QSS Generator
 Author: Ali Kamrani (MRThugh)
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+import os
+
+_ASSET_CACHE_DIR: Optional[str] = None
+
+
+def get_spinbox_arrow_icons(theme_key: str, palette: Dict[str, str]) -> Dict[str, str]:
+    """
+    Ensure resolution-independent SVG arrow icons for QSpinBox / QDoubleSpinBox exist and return paths.
+    """
+    global _ASSET_CACHE_DIR
+    if _ASSET_CACHE_DIR is None:
+        base = os.path.join(os.path.dirname(__file__), "..", "resources", "assets")
+        os.makedirs(base, exist_ok=True)
+        _ASSET_CACHE_DIR = base
+
+    text_color = palette.get("text", "#f4f4f5")
+    muted_color = palette.get("text_muted", "#71717a")
+
+    up_path = os.path.join(_ASSET_CACHE_DIR, f"spin_up_{theme_key}.svg")
+    down_path = os.path.join(_ASSET_CACHE_DIR, f"spin_down_{theme_key}.svg")
+    up_dis_path = os.path.join(_ASSET_CACHE_DIR, f"spin_up_disabled_{theme_key}.svg")
+    down_dis_path = os.path.join(_ASSET_CACHE_DIR, f"spin_down_disabled_{theme_key}.svg")
+
+    if not os.path.exists(up_path):
+        with open(up_path, "w", encoding="utf-8") as f:
+            f.write(f'<svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5"><polygon points="4,0 0,5 8,5" fill="{text_color}"/></svg>')
+
+    if not os.path.exists(down_path):
+        with open(down_path, "w", encoding="utf-8") as f:
+            f.write(f'<svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5"><polygon points="4,5 0,0 8,0" fill="{text_color}"/></svg>')
+
+    if not os.path.exists(up_dis_path):
+        with open(up_dis_path, "w", encoding="utf-8") as f:
+            f.write(f'<svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5"><polygon points="4,0 0,5 8,5" fill="{muted_color}"/></svg>')
+
+    if not os.path.exists(down_dis_path):
+        with open(down_dis_path, "w", encoding="utf-8") as f:
+            f.write(f'<svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5"><polygon points="4,5 0,0 8,0" fill="{muted_color}"/></svg>')
+
+    return {
+        "up": up_path.replace(os.sep, "/"),
+        "down": down_path.replace(os.sep, "/"),
+        "up_disabled": up_dis_path.replace(os.sep, "/"),
+        "down_disabled": down_dis_path.replace(os.sep, "/"),
+    }
 
 THEME_PALETTES: Dict[str, Dict[str, str]] = {
     "dark": {
@@ -145,6 +190,7 @@ def get_theme_stylesheet(theme_key: str = "dark") -> str:
     Generate a complete, modern Qt stylesheet tailored to the selected theme palette.
     """
     p = THEME_PALETTES.get(theme_key, THEME_PALETTES["dark"])
+    arrows = get_spinbox_arrow_icons(theme_key, p)
 
     return f"""
     /* === BASE WINDOW & DIALOGS === */
@@ -296,7 +342,7 @@ def get_theme_stylesheet(theme_key: str = "dark") -> str:
     }}
 
     /* === INPUTS & CONTROLS === */
-    QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {{
+    QLineEdit, QComboBox {{
         background-color: {p["surface"]};
         color: {p["text"]};
         border: 1px solid {p["border"]};
@@ -305,8 +351,13 @@ def get_theme_stylesheet(theme_key: str = "dark") -> str:
         selection-background-color: {p["primary"]};
         selection-color: {p["primary_text"]};
     }}
-    QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {{
+    QLineEdit:focus, QComboBox:focus {{
         border: 1px solid {p["border_focus"]};
+    }}
+    QLineEdit:disabled, QComboBox:disabled {{
+        background-color: {p["surface_sunken"]};
+        color: {p["text_muted"]};
+        border-color: {p["border_subtle"]};
     }}
     QComboBox::drop-down {{
         border: none;
@@ -320,6 +371,92 @@ def get_theme_stylesheet(theme_key: str = "dark") -> str:
         selection-color: {p["primary_text"]};
         padding: 4px;
         border-radius: 4px;
+    }}
+
+    /* === GLOBAL NUMERIC SPINNERS (QSpinBox & QDoubleSpinBox) === */
+    QSpinBox, QDoubleSpinBox {{
+        background-color: {p["surface"]};
+        color: {p["text"]};
+        border: 1px solid {p["border"]};
+        border-radius: 4px;
+        padding-top: 3px;
+        padding-bottom: 3px;
+        padding-left: 6px;
+        padding-right: 22px;
+        min-height: 22px;
+        selection-background-color: {p["primary"]};
+        selection-color: {p["primary_text"]};
+    }}
+    QSpinBox:focus, QDoubleSpinBox:focus {{
+        border: 1px solid {p["border_focus"]};
+    }}
+    QSpinBox:disabled, QDoubleSpinBox:disabled {{
+        background-color: {p["surface_sunken"]};
+        color: {p["text_muted"]};
+        border-color: {p["border_subtle"]};
+    }}
+
+    /* Spinner Up Button */
+    QSpinBox::up-button, QDoubleSpinBox::up-button {{
+        subcontrol-origin: border;
+        subcontrol-position: top right;
+        width: 18px;
+        border-left: 1px solid {p["border_subtle"]};
+        border-bottom: 1px solid {p["border_subtle"]};
+        border-top-right-radius: 3px;
+        background-color: {p["surface_raised"]};
+        margin: 1px 1px 0 0;
+    }}
+    QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {{
+        background-color: {p["border"]};
+    }}
+    QSpinBox::up-button:pressed, QDoubleSpinBox::up-button:pressed {{
+        background-color: {p["primary"]};
+    }}
+    QSpinBox::up-button:disabled, QDoubleSpinBox::up-button:disabled {{
+        background-color: transparent;
+        border-color: transparent;
+    }}
+    QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
+        image: url({arrows["up"]});
+        width: 8px;
+        height: 5px;
+    }}
+    QSpinBox::up-arrow:disabled, QDoubleSpinBox::up-arrow:disabled {{
+        image: url({arrows["up_disabled"]});
+        width: 8px;
+        height: 5px;
+    }}
+
+    /* Spinner Down Button */
+    QSpinBox::down-button, QDoubleSpinBox::down-button {{
+        subcontrol-origin: border;
+        subcontrol-position: bottom right;
+        width: 18px;
+        border-left: 1px solid {p["border_subtle"]};
+        border-bottom-right-radius: 3px;
+        background-color: {p["surface_raised"]};
+        margin: 0 1px 1px 0;
+    }}
+    QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
+        background-color: {p["border"]};
+    }}
+    QSpinBox::down-button:pressed, QDoubleSpinBox::down-button:pressed {{
+        background-color: {p["primary"]};
+    }}
+    QSpinBox::down-button:disabled, QDoubleSpinBox::down-button:disabled {{
+        background-color: transparent;
+        border-color: transparent;
+    }}
+    QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
+        image: url({arrows["down"]});
+        width: 8px;
+        height: 5px;
+    }}
+    QSpinBox::down-arrow:disabled, QDoubleSpinBox::down-arrow:disabled {{
+        image: url({arrows["down_disabled"]});
+        width: 8px;
+        height: 5px;
     }}
 
     /* === SLIDERS === */

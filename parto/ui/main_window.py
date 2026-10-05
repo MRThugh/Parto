@@ -27,7 +27,7 @@ from ..editor.canvas import Canvas
 from ..editor.engine import EditorEngine
 from ..tools.move import MoveTool
 from ..tools.crop import CropTool
-from ..tools.brush import BrushTool
+from ..tools.brush import BrushTool, BrushPresetManager
 from ..tools.eyedropper import EyedropperTool
 from ..image.info import get_image_metadata
 from ..themes.manager import get_theme_manager
@@ -41,6 +41,7 @@ from .widgets.brush_bar import BrushBar
 from .widgets.toast import Toast
 from .panels.adjustments import AdjustmentDock
 from .panels.layers_panel import LayersDock
+from .panels.brush_panel import BrushDock, BrushPanel
 from .dock_animator import DockAnimator
 from .statusbar import EditorStatusBar
 from .toolbar import EditorToolBar
@@ -79,6 +80,7 @@ class MainWindow(QMainWindow):
         self.document = Document(parent=self)
         self.engine = EditorEngine(document=self.document)
         self.async_runner = AsyncOperationRunner(parent=self)
+        self.preset_manager = BrushPresetManager()
 
         # Interactive Tools
         self.tool_move = MoveTool()
@@ -126,6 +128,7 @@ class MainWindow(QMainWindow):
         # Brush Bar (Hidden by default until Brush tool is active)
         self.brush_bar = BrushBar(self)
         self.brush_bar.hide()
+        self.brush_bar.bind_settings(self.tool_brush.settings)
         self.brush_bar.size_changed.connect(self.tool_brush.set_size)
         self.brush_bar.opacity_changed.connect(self.tool_brush.set_opacity)
         self.brush_bar.hardness_changed.connect(self.tool_brush.set_hardness)
@@ -165,15 +168,32 @@ class MainWindow(QMainWindow):
         self.layers_dock.hide()
         self.adjustments_dock.hide()
 
+        # Brush Dock (Right, tabified with Layers and Adjustments)
+        self.brush_dock = BrushDock(self.tool_brush.settings, self.preset_manager, self)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.brush_dock)
+        self.tabifyDockWidget(self.adjustments_dock, self.brush_dock)
+        self.brush_dock.hide()
+
         # Smooth dock transitions
         self.layers_animator = DockAnimator(self, self.layers_dock, target_width=280, duration_ms=200)
         self.adjustments_animator = DockAnimator(self, self.adjustments_dock, target_width=280, duration_ms=200)
+        self.brush_animator = DockAnimator(self, self.brush_dock, target_width=280, duration_ms=200)
 
     def toggle_layers_dock(self, animate: bool = True):
         self.layers_animator.toggle(animate=animate)
 
     def toggle_adjustments_dock(self, animate: bool = True):
         self.adjustments_animator.toggle(animate=animate)
+
+    def toggle_brush_dock(self, animate: bool = True):
+        self.brush_animator.toggle(animate=animate)
+
+    def set_brush_dock_visible(self, visible: bool, animate: bool = True):
+        self.brush_animator.set_visible(visible, animate=animate)
+        sm = get_shortcut_manager()
+        defn = sm.get("view_brush")
+        if defn and defn.action:
+            defn.action.setChecked(visible)
 
     def set_layers_dock_visible(self, visible: bool, animate: bool = True):
         self.layers_animator.set_visible(visible, animate=animate)
@@ -230,6 +250,7 @@ class MainWindow(QMainWindow):
         # Docks
         self.toolbar.act_layers_panel = self.toolbar.register_action("layers", "Layers Panel (F7)", "layers")
         self.toolbar.act_adjustments_panel = self.toolbar.register_action("adjust", "Adjustments (F8)", "adjust")
+        self.toolbar.act_brush_panel = self.toolbar.register_action("brush_panel", "Brush Panel (F9)", "brush")
 
         # Retain references for tests and tool switches
         self.tb_tool_move = self.toolbar.act_tool_move
@@ -263,6 +284,7 @@ class MainWindow(QMainWindow):
 
         self.toolbar.act_layers_panel.triggered.connect(self.toggle_layers_dock)
         self.toolbar.act_adjustments_panel.triggered.connect(self.toggle_adjustments_dock)
+        self.toolbar.act_brush_panel.triggered.connect(self.toggle_brush_dock)
 
     def _init_statusbar(self):
         """Construct bottom statusbar showing coordinates, RGB, and zoom."""
@@ -473,6 +495,8 @@ class MainWindow(QMainWindow):
     def action_tool_move(self):
         self.crop_bar.hide()
         self.brush_bar.hide()
+        if hasattr(self, "brush_dock") and self.brush_dock.isVisible():
+            self.set_brush_dock_visible(False, animate=False)
         self.canvas.set_tool(self.tool_move)
         self.tb_tool_move.setChecked(True)
 
@@ -480,6 +504,8 @@ class MainWindow(QMainWindow):
         if not self.document.has_image:
             return
         self.brush_bar.hide()
+        if hasattr(self, "brush_dock") and self.brush_dock.isVisible():
+            self.set_brush_dock_visible(False, animate=False)
         self.crop_bar.show()
         self.crop_bar.set_dimension_text(f"{self.document.width} × {self.document.height} px")
         self.canvas.set_tool(self.tool_crop)
@@ -506,6 +532,8 @@ class MainWindow(QMainWindow):
         self.brush_bar.set_opacity(self.tool_brush.opacity)
         self.brush_bar.set_hardness(self.tool_brush.hardness)
         self.brush_bar.set_colors(self.tool_brush.color, self.tool_brush.background_color)
+        if hasattr(self, "set_brush_dock_visible"):
+            self.set_brush_dock_visible(True, animate=False)
         self.canvas.set_tool(self.tool_brush)
         self.tb_tool_brush.setChecked(True)
         self.toast.show_message("Brush Tool active — [ / ] resize, X swap, D reset")
@@ -513,6 +541,8 @@ class MainWindow(QMainWindow):
     def action_tool_eyedropper(self):
         self.crop_bar.hide()
         self.brush_bar.hide()
+        if hasattr(self, "brush_dock") and self.brush_dock.isVisible():
+            self.set_brush_dock_visible(False, animate=False)
         self.canvas.set_tool(self.tool_eyedropper)
         self.tb_tool_eyedropper.setChecked(True)
         self.toast.show_message("Eyedropper active — Click pixel to sample color")
