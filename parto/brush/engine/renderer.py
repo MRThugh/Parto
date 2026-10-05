@@ -132,7 +132,7 @@ class BrushRenderer:
             else:
                 dest = (px + sx1, py + sy1)
                 if mode_str and mode_str != "normal":
-                    from ...image.layers import _blend_mode_composite
+                    from ...layers import _blend_mode_composite
                     _blend_mode_composite(target_image, dab_crop, dest, mode_str)
                 else:
                     target_image.alpha_composite(dab_crop, dest=dest)

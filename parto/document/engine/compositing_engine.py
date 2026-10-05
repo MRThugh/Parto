@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Optional, Tuple
 from PIL import Image
 
-from ...image.layers import LayerStack, compose_layers
+from ...layers import LayerStack, compose_layers
 from ...image.processing import apply_color_adjustments
 from ...image.filters import apply_filter
 

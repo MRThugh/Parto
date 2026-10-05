@@ -19,7 +19,7 @@ from .engine.document_engine import DocumentEngine
 from .history.transaction import TransactionCoordinator, snapshots_equal
 from .adapters.storage_adapter import DocumentStorageAdapter
 from .controller.document_controller import DocumentController
-from ..image.layers import Layer, LayerStack
+from ..layers import Layer, LayerStack
 from ..history.manager import HistoryManager
 
 

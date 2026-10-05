@@ -15,7 +15,7 @@ from ..models.document_state import DocumentState
 from ..engine.document_engine import DocumentEngine
 from ..history.transaction import TransactionCoordinator
 from ..adapters.storage_adapter import DocumentStorageAdapter
-from ...image.layers import Layer
+from ...layers import Layer
 from ...history.manager import HistoryManager
 
 

@@ -12,7 +12,7 @@ from PIL import Image
 
 from .transform_engine import TransformEngine
 from .compositing_engine import CompositingEngine
-from ...image.layers import Layer, LayerStack
+from ...layers import Layer, LayerStack
 from ...image.processing import apply_color_adjustments, remove_background
 from ...image.filters import apply_filter, FILTER_MAP
 

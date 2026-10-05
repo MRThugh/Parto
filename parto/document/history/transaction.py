@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional, Callable
 from PIL import Image
 
 from ..models.document_state import DocumentState
-from ...image.layers import LayerStack
+from ...layers import LayerStack
 from ...history.manager import HistoryManager
 from ...history.commands import SnapshotCommand
 

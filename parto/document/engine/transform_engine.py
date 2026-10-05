@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Tuple, Optional
 from PIL import Image
 
-from ...image.layers import LayerStack
+from ...layers import LayerStack
 from ..geometry import (
     transform_layer_crop,
     transform_layer_resize,
