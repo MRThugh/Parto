@@ -32,7 +32,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
 )
 
-from ...tools.brush import BrushSettings, BrushPreset, BrushPresetManager
+from ...brush import BrushSettings, BrushPreset, BrushPresetManager
 from ..widgets.brush_bar import BrushPreviewWidget, ColorChipButton
 from ...themes.manager import get_theme_manager
 

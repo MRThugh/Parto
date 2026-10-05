@@ -27,7 +27,7 @@ from ..editor.canvas import Canvas
 from ..editor.engine import EditorEngine
 from ..tools.move import MoveTool
 from ..tools.crop import CropTool
-from ..tools.brush import BrushTool, BrushPresetManager
+from ..brush import BrushTool, BrushPresetManager
 from ..tools.eyedropper import EyedropperTool
 from ..image.info import get_image_metadata
 from ..themes.manager import get_theme_manager
