@@ -50,7 +50,19 @@ class Document(QObject):
             transactions=self._transactions,
             on_state_changed=self._on_controller_state_changed,
             on_selection_changed=self._on_controller_selection_changed,
+            document=self,
         )
+
+    # --- Controller & Subsystem Properties ---
+    @property
+    def controller(self) -> DocumentController:
+        """Authoritative DocumentController coordinator and facade."""
+        return self._controller
+
+    @property
+    def engine(self) -> DocumentEngine:
+        """Domain engine performing low-level image processing."""
+        return self._engine
 
     # --- Internal Signal Relays ---
     def _on_controller_state_changed(self) -> None:

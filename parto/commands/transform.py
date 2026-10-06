@@ -32,37 +32,42 @@ class RotateCommand(Command):
         self.document = document
         self.clockwise = clockwise
         self.is_180 = is_180
-        # Capture pre-state snapshot
+        # Capture pre-state snapshot for fallback
         self._before_snap = document.create_snapshot() if hasattr(document, "create_snapshot") else None
         self._after_snap: Optional[Dict[str, Any]] = None
+
+    def _apply_domain(self, clockwise: bool, is_180: bool) -> None:
+        if hasattr(self.document, "apply_rotate_domain"):
+            self.document.apply_rotate_domain(clockwise=clockwise, is_180=is_180)
+        elif hasattr(self.document, "_controller") and hasattr(self.document._controller, "apply_rotate_domain"):
+            self.document._controller.apply_rotate_domain(clockwise=clockwise, is_180=is_180)
+        elif is_180:
+            self.document.rotate_180_document()
+        else:
+            self.document.rotate_document(clockwise=clockwise)
 
     def execute(self) -> None:
         if self._after_snap is not None:
             self.redo()
             return
-        if self.is_180:
-            self.document.rotate_180_document()
-        else:
-            self.document.rotate_document(clockwise=self.clockwise)
+        self._apply_domain(self.clockwise, self.is_180)
         if hasattr(self.document, "create_snapshot"):
             self._after_snap = self.document.create_snapshot()
 
     def redo(self) -> None:
         if self._after_snap and hasattr(self.document, "restore_snapshot"):
             self.document.restore_snapshot(self._after_snap)
-        elif self.is_180:
-            self.document.rotate_180_document()
         else:
-            self.document.rotate_document(clockwise=self.clockwise)
+            self._apply_domain(self.clockwise, self.is_180)
 
     def undo(self) -> None:
         if self._before_snap and hasattr(self.document, "restore_snapshot"):
             self.document.restore_snapshot(self._before_snap)
         elif self.is_180:
-            self.document.rotate_180_document()
+            self._apply_domain(True, True)
         else:
             # Reverse 90 deg rotation
-            self.document.rotate_document(clockwise=not self.clockwise)
+            self._apply_domain(not self.clockwise, False)
 
 
 class FlipCommand(Command):
@@ -76,32 +81,35 @@ class FlipCommand(Command):
         self._before_snap = document.create_snapshot() if hasattr(document, "create_snapshot") else None
         self._after_snap: Optional[Dict[str, Any]] = None
 
+    def _apply_domain(self, horizontal: bool) -> None:
+        if hasattr(self.document, "apply_flip_domain"):
+            self.document.apply_flip_domain(horizontal=horizontal)
+        elif hasattr(self.document, "_controller") and hasattr(self.document._controller, "apply_flip_domain"):
+            self.document._controller.apply_flip_domain(horizontal=horizontal)
+        elif horizontal:
+            self.document.flip_horizontal_document()
+        else:
+            self.document.flip_vertical_document()
+
     def execute(self) -> None:
         if self._after_snap is not None:
             self.redo()
             return
-        if self.horizontal:
-            self.document.flip_horizontal_document()
-        else:
-            self.document.flip_vertical_document()
+        self._apply_domain(self.horizontal)
         if hasattr(self.document, "create_snapshot"):
             self._after_snap = self.document.create_snapshot()
 
     def redo(self) -> None:
         if self._after_snap and hasattr(self.document, "restore_snapshot"):
             self.document.restore_snapshot(self._after_snap)
-        elif self.horizontal:
-            self.document.flip_horizontal_document()
         else:
-            self.document.flip_vertical_document()
+            self._apply_domain(self.horizontal)
 
     def undo(self) -> None:
         if self._before_snap and hasattr(self.document, "restore_snapshot"):
             self.document.restore_snapshot(self._before_snap)
-        elif self.horizontal:
-            self.document.flip_horizontal_document()
         else:
-            self.document.flip_vertical_document()
+            self._apply_domain(self.horizontal)
 
 
 class ResizeCommand(Command):
@@ -125,11 +133,19 @@ class ResizeCommand(Command):
         self._before_snap = document.create_snapshot() if hasattr(document, "create_snapshot") else None
         self._after_snap: Optional[Dict[str, Any]] = None
 
+    def _apply_domain(self, nw: int, nh: int, resample: int) -> None:
+        if hasattr(self.document, "apply_resize_domain"):
+            self.document.apply_resize_domain(nw, nh, resample)
+        elif hasattr(self.document, "_controller") and hasattr(self.document._controller, "apply_resize_domain"):
+            self.document._controller.apply_resize_domain(nw, nh, resample)
+        else:
+            self.document.resize_document(nw, nh, resample=resample)
+
     def execute(self) -> None:
         if self._after_snap is not None:
             self.redo()
             return
-        self.document.resize_document(self.new_width, self.new_height, resample=self.resample)
+        self._apply_domain(self.new_width, self.new_height, self.resample)
         if hasattr(self.document, "create_snapshot"):
             self._after_snap = self.document.create_snapshot()
 
@@ -137,7 +153,7 @@ class ResizeCommand(Command):
         if self._after_snap and hasattr(self.document, "restore_snapshot"):
             self.document.restore_snapshot(self._after_snap)
         else:
-            self.document.resize_document(self.new_width, self.new_height, resample=self.resample)
+            self._apply_domain(self.new_width, self.new_height, self.resample)
 
     def undo(self) -> None:
         if self._before_snap and hasattr(self.document, "restore_snapshot"):
@@ -154,11 +170,19 @@ class CropCommand(Command):
         self._before_snap = document.create_snapshot() if hasattr(document, "create_snapshot") else None
         self._after_snap: Optional[Dict[str, Any]] = None
 
+    def _apply_domain(self, rect: Tuple[int, int, int, int]) -> None:
+        if hasattr(self.document, "apply_crop_domain"):
+            self.document.apply_crop_domain(rect)
+        elif hasattr(self.document, "_controller") and hasattr(self.document._controller, "apply_crop_domain"):
+            self.document._controller.apply_crop_domain(rect)
+        else:
+            self.document.crop_document(rect)
+
     def execute(self) -> None:
         if self._after_snap is not None:
             self.redo()
             return
-        self.document.crop_document(self.crop_rect)
+        self._apply_domain(self.crop_rect)
         if hasattr(self.document, "create_snapshot"):
             self._after_snap = self.document.create_snapshot()
 
@@ -166,7 +190,7 @@ class CropCommand(Command):
         if self._after_snap and hasattr(self.document, "restore_snapshot"):
             self.document.restore_snapshot(self._after_snap)
         else:
-            self.document.crop_document(self.crop_rect)
+            self._apply_domain(self.crop_rect)
 
     def undo(self) -> None:
         if self._before_snap and hasattr(self.document, "restore_snapshot"):

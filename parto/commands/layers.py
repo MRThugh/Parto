@@ -16,21 +16,29 @@ from ..layers.models.layer_stack import LayerStack
 
 
 def _invalidate(doc_or_stack: Any) -> None:
-    """Helper to safely invalidate compositing cache on document or stack."""
+    """Helper to safely invalidate compositing cache on document, controller, or stack."""
     if hasattr(doc_or_stack, "invalidate_composite"):
         doc_or_stack.invalidate_composite()
+    elif hasattr(doc_or_stack, "notify_state_changed"):
+        doc_or_stack.notify_state_changed()
+    elif hasattr(doc_or_stack, "engine") and hasattr(doc_or_stack.engine, "compositing"):
+        doc_or_stack.engine.compositing.invalidate()
     elif hasattr(doc_or_stack, "_engine") and hasattr(doc_or_stack._engine, "compositing"):
         doc_or_stack._engine.compositing.invalidate()
+    if hasattr(doc_or_stack, "layer_selection_changed") and hasattr(doc_or_stack, "active_layer_index"):
+        doc_or_stack.layer_selection_changed.emit(doc_or_stack.active_layer_index)
 
 
 def _get_stack(target: Any) -> LayerStack:
-    """Extract authoritative LayerStack from target (Document or LayerStack)."""
+    """Extract authoritative LayerStack from target (Document, DocumentController, DocumentState, or LayerStack)."""
     if isinstance(target, LayerStack):
         return target
     if hasattr(target, "layer_stack") and isinstance(target.layer_stack, LayerStack):
         return target.layer_stack
-    if hasattr(target, "_state") and hasattr(target._state, "layer_stack"):
+    if hasattr(target, "_state") and hasattr(target._state, "layer_stack") and isinstance(target._state.layer_stack, LayerStack):
         return target._state.layer_stack
+    if hasattr(target, "state") and hasattr(target.state, "layer_stack") and isinstance(target.state.layer_stack, LayerStack):
+        return target.state.layer_stack
     raise TypeError(f"Target {target} does not expose an authoritative LayerStack")
 
 
@@ -76,7 +84,7 @@ class CreateLayerCommand(Command):
 class DeleteLayerCommand(Command):
     """Command that removes a layer from the layer stack, with exact index restoration."""
 
-    def __init__(self, target: Any, layer: Layer, index: int):
+    def __init__(self, target: Any, layer: Layer, index: int = -1):
         super().__init__(
             name=f"Delete {layer.name}",
             id="layer.delete",
@@ -111,7 +119,7 @@ class DeleteLayerCommand(Command):
 class DuplicateLayerCommand(Command):
     """Command that duplicates an existing layer directly above it."""
 
-    def __init__(self, target: Any, original_layer: Layer, duplicated_layer: Layer, index: int):
+    def __init__(self, target: Any, original_layer: Layer, duplicated_layer: Optional[Layer] = None, index: int = -1):
         super().__init__(
             name=f"Duplicate {original_layer.name}",
             id="layer.duplicate",
@@ -119,11 +127,13 @@ class DuplicateLayerCommand(Command):
         )
         self.target = target
         self.original_layer = original_layer
-        self.duplicated_layer = duplicated_layer
+        self.duplicated_layer = duplicated_layer if duplicated_layer is not None else original_layer.duplicate()
         self.index = index
 
     def execute(self) -> None:
         stack = _get_stack(self.target)
+        if self.index < 0 and self.original_layer in stack.layers:
+            self.index = stack.layers.index(self.original_layer)
         insert_idx = min(self.index + 1, len(stack))
         stack.insert_layer(insert_idx, self.duplicated_layer)
         _invalidate(self.target)
@@ -184,27 +194,45 @@ class MergeDownCommand(Command):
         self,
         target: Any,
         upper_index: int,
-        upper_layer: Layer,
-        lower_layer: Layer,
-        merged_layer: Layer,
+        upper_layer: Optional[Layer] = None,
+        lower_layer: Optional[Layer] = None,
+        merged_layer: Optional[Layer] = None,
     ):
+        stack = _get_stack(target)
+        if upper_layer is None and 0 < upper_index < len(stack):
+            upper_layer = stack[upper_index]
+        if lower_layer is None and 0 < upper_index < len(stack):
+            lower_layer = stack[upper_index - 1]
+
+        u_name = upper_layer.name if upper_layer else "Layer"
+        l_name = lower_layer.name if lower_layer else "Layer"
+
         super().__init__(
-            name=f"Merge {upper_layer.name} Down",
+            name=f"Merge {u_name} Down",
             id="layer.merge_down",
-            description=f"Merge layer {upper_layer.name} down into {lower_layer.name}",
+            description=f"Merge layer {u_name} down into {l_name}",
         )
         self.target = target
         self.upper_index = upper_index
         self.lower_index = upper_index - 1
-        self.upper_layer = upper_layer.clone()
-        self.lower_layer = lower_layer.clone()
-        self.merged_layer = merged_layer.clone()
+        self.upper_layer = upper_layer.clone() if upper_layer else None
+        self.lower_layer = lower_layer.clone() if lower_layer else None
+        self.merged_layer = merged_layer.clone() if merged_layer else None
 
     def execute(self) -> None:
         stack = _get_stack(self.target)
-        # Remove upper and lower layers, insert merged layer at lower_index
+        if self.merged_layer is not None:
+            self.redo()
+            return
+        # Ensure upper and lower are captured if not set
+        if self.upper_layer is None and 0 < self.upper_index < len(stack):
+            self.upper_layer = stack[self.upper_index].clone()
+        if self.lower_layer is None and 0 < self.upper_index < len(stack):
+            self.lower_layer = stack[self.lower_index].clone()
         if 0 < self.upper_index < len(stack):
-            stack.merge_down(self.upper_index)
+            res = stack.merge_down(self.upper_index)
+            if res is not None:
+                self.merged_layer = res.clone()
         _invalidate(self.target)
 
     def redo(self) -> None:
@@ -214,14 +242,15 @@ class MergeDownCommand(Command):
         new_layers = []
         replaced = False
         for i, lay in enumerate(layers):
-            if lay.id == self.lower_layer.id:
-                new_layers.append(self.merged_layer.clone())
+            if self.lower_layer and lay.id == self.lower_layer.id:
+                if self.merged_layer:
+                    new_layers.append(self.merged_layer.clone())
                 replaced = True
-            elif lay.id == self.upper_layer.id:
+            elif self.upper_layer and lay.id == self.upper_layer.id:
                 continue
             else:
                 new_layers.append(lay)
-        if not replaced and 0 <= self.lower_index < len(layers):
+        if not replaced and self.merged_layer and 0 <= self.lower_index < len(layers):
             layers[self.lower_index:self.upper_index + 1] = [self.merged_layer.clone()]
         else:
             stack._layers = new_layers
@@ -235,17 +264,21 @@ class MergeDownCommand(Command):
         new_layers = []
         replaced = False
         for lay in layers:
-            if lay.id == self.merged_layer.id:
-                new_layers.append(self.lower_layer.clone())
-                new_layers.append(self.upper_layer.clone())
+            if self.merged_layer and lay.id == self.merged_layer.id:
+                if self.lower_layer:
+                    new_layers.append(self.lower_layer.clone())
+                if self.upper_layer:
+                    new_layers.append(self.upper_layer.clone())
                 replaced = True
             else:
                 new_layers.append(lay)
         if not replaced and 0 <= self.lower_index < len(layers):
-            layers[self.lower_index:self.lower_index + 1] = [
-                self.lower_layer.clone(),
-                self.upper_layer.clone(),
-            ]
+            to_restore = []
+            if self.lower_layer:
+                to_restore.append(self.lower_layer.clone())
+            if self.upper_layer:
+                to_restore.append(self.upper_layer.clone())
+            layers[self.lower_index:self.lower_index + 1] = to_restore
         else:
             stack._layers = new_layers
         stack.set_active_index(self.upper_index)
