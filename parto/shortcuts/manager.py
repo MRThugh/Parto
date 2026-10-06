@@ -1,7 +1,8 @@
 # parto/shortcuts/manager.py
 """
-Parto v0.3.0 - Centralized Shortcut Manager
+Parto Architecture 2.0 - Centralized Shortcut Manager
 Coordinates action shortcuts, categories, conflicts, and discovery dialogs.
+Integrated with ActionRegistry.
 Author: Ali Kamrani (MRThugh)
 """
 
@@ -24,6 +25,7 @@ class ShortcutDefinition:
 class ShortcutManager:
     """
     Centralized registry of application keyboard shortcuts.
+    Coordinates directly with Action Architecture 2.0.
 
     Conflict Resolution Rules:
     --------------------------
@@ -53,6 +55,26 @@ class ShortcutManager:
         if cls._instance is None:
             cls._instance = ShortcutManager()
         return cls._instance
+
+    def _resolve_id(self, action_id: str) -> str:
+        """Resolve legacy or aliased action IDs using ActionRegistry if available."""
+        if action_id in self._shortcuts:
+            return action_id
+        if action_id == "view_brush" and "brush_studio" in self._shortcuts:
+            return "brush_studio"
+        try:
+            from ..actions.registry import get_action_registry
+            reg = get_action_registry()
+            canonical = reg._aliases.get(action_id)
+            if canonical and canonical in self._shortcuts:
+                return canonical
+            # Reverse lookup alias
+            for alias, target in reg._aliases.items():
+                if target == action_id and alias in self._shortcuts:
+                    return alias
+        except Exception:
+            pass
+        return action_id
 
     def register(
         self,
@@ -106,6 +128,16 @@ class ShortcutManager:
         )
         self._shortcuts[action_id] = defn
 
+        # Sync with ActionRegistry if action exists there
+        try:
+            from ..actions.registry import get_action_registry
+            reg = get_action_registry()
+            act = reg.get(action_id)
+            if act is not None:
+                act.shortcut = key_sequence
+        except Exception:
+            pass
+
         if action is not None:
             if key_sequence:
                 from PySide6.QtCore import Qt
@@ -123,7 +155,8 @@ class ShortcutManager:
 
     def unbind_shortcut(self, action_id: str) -> bool:
         """Unbind shortcut from an action, keeping the action registered with no key sequence."""
-        defn = self._shortcuts.get(action_id)
+        resolved = self._resolve_id(action_id)
+        defn = self._shortcuts.get(resolved)
         if not defn:
             return False
         defn.key_sequence = ""
@@ -131,6 +164,13 @@ class ShortcutManager:
             defn.action.setShortcut(QKeySequence())
             base_tip = defn.description or defn.name
             defn.action.setToolTip(base_tip)
+        try:
+            from ..actions.registry import get_action_registry
+            act = get_action_registry().get(resolved)
+            if act is not None:
+                act.shortcut = ""
+        except Exception:
+            pass
         return True
 
     def resolve_conflict(self, key_sequence: str, keep_action_id: str) -> bool:
@@ -140,15 +180,16 @@ class ShortcutManager:
         """
         norm = key_sequence.strip().lower()
         found = False
+        resolved_keep = self._resolve_id(keep_action_id)
         for aid, defn in list(self._shortcuts.items()):
             if defn.key_sequence and defn.key_sequence.strip().lower() == norm:
-                if aid != keep_action_id:
+                if aid != resolved_keep:
                     self.unbind_shortcut(aid)
                 else:
                     found = True
 
-        if not found and keep_action_id in self._shortcuts:
-            self.remap_shortcut(keep_action_id, key_sequence)
+        if not found and resolved_keep in self._shortcuts:
+            self.remap_shortcut(resolved_keep, key_sequence)
             return True
         return found
 
@@ -156,7 +197,8 @@ class ShortcutManager:
         """
         Dynamically update key sequence for a registered action, synchronizing with QAction.
         """
-        defn = self._shortcuts.get(action_id)
+        resolved = self._resolve_id(action_id)
+        defn = self._shortcuts.get(resolved)
         if not defn:
             return False
 
@@ -166,7 +208,7 @@ class ShortcutManager:
             norm_new = new_key_sequence.strip().lower()
             conflicting_ids = [
                 existing_id for existing_id, existing_defn in self._shortcuts.items()
-                if existing_id != action_id
+                if existing_id != resolved
                 and existing_defn.key_sequence
                 and existing_defn.key_sequence.strip().lower() == norm_new
             ]
@@ -174,7 +216,7 @@ class ShortcutManager:
                 import logging
                 log = logging.getLogger("parto.shortcuts")
                 log.warning(
-                    f"[Parto Shortcut Conflict] Shortcut '{new_key_sequence}' remapped for '{action_id}' conflicts with {conflicting_ids}"
+                    f"[Parto Shortcut Conflict] Shortcut '{new_key_sequence}' remapped for '{resolved}' conflicts with {conflicting_ids}"
                 )
                 if active_policy == "reject":
                     raise ValueError(
@@ -185,6 +227,14 @@ class ShortcutManager:
                         self.unbind_shortcut(cid)
 
         defn.key_sequence = new_key_sequence
+        try:
+            from ..actions.registry import get_action_registry
+            act = get_action_registry().get(resolved)
+            if act is not None:
+                act.shortcut = new_key_sequence
+        except Exception:
+            pass
+
         if defn.action is not None:
             if new_key_sequence:
                 from PySide6.QtCore import Qt
@@ -214,14 +264,12 @@ class ShortcutManager:
         return True
 
     def __contains__(self, action_id: str) -> bool:
-        if action_id == "view_brush" and "view_brush" not in self._shortcuts:
-            return "brush_studio" in self._shortcuts
-        return action_id in self._shortcuts
+        resolved = self._resolve_id(action_id)
+        return resolved in self._shortcuts
 
     def get(self, action_id: str) -> Optional[ShortcutDefinition]:
-        if action_id == "view_brush" and "view_brush" not in self._shortcuts:
-            return self._shortcuts.get("brush_studio")
-        return self._shortcuts.get(action_id)
+        resolved = self._resolve_id(action_id)
+        return self._shortcuts.get(resolved)
 
     def get_all(self) -> List[ShortcutDefinition]:
         return list(self._shortcuts.values())
@@ -241,23 +289,27 @@ class ShortcutManager:
         return self.get_by_category().get(category, [])
 
     def get_action(self, action_id: str) -> Optional[QAction]:
-        defn = self._shortcuts.get(action_id)
+        resolved = self._resolve_id(action_id)
+        defn = self._shortcuts.get(resolved)
         return defn.action if defn else None
 
     def get_shortcut_string(self, action_id: str) -> str:
-        defn = self._shortcuts.get(action_id)
+        resolved = self._resolve_id(action_id)
+        defn = self._shortcuts.get(resolved)
         return defn.key_sequence if defn else ""
 
     def get_default_shortcut_string(self, action_id: str) -> str:
-        return self._default_shortcuts.get(action_id, "")
+        resolved = self._resolve_id(action_id)
+        return self._default_shortcuts.get(resolved, "")
 
     def find_conflict_for(self, action_id: str, candidate_key: str) -> Optional[ShortcutDefinition]:
         """Check if candidate_key collides with any other action."""
         if not candidate_key:
             return None
         norm = candidate_key.strip().lower()
+        resolved = self._resolve_id(action_id)
         for existing_id, defn in self._shortcuts.items():
-            if existing_id != action_id and defn.key_sequence and defn.key_sequence.strip().lower() == norm:
+            if existing_id != resolved and defn.key_sequence and defn.key_sequence.strip().lower() == norm:
                 return defn
         return None
 
@@ -268,9 +320,10 @@ class ShortcutManager:
 
     def reset_action_to_default(self, action_id: str) -> bool:
         """Reset a single action to its default shortcut."""
-        if action_id in self._default_shortcuts:
-            def_key = self._default_shortcuts[action_id]
-            return self.remap_shortcut(action_id, def_key, policy="override")
+        resolved = self._resolve_id(action_id)
+        if resolved in self._default_shortcuts:
+            def_key = self._default_shortcuts[resolved]
+            return self.remap_shortcut(resolved, def_key, policy="override")
         return False
 
 

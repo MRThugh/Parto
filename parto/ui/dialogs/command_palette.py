@@ -1,11 +1,15 @@
 # parto/ui/dialogs/command_palette.py
 """
-Parto v0.3.0 - Searchable Command Palette (Ctrl+Shift+P)
+Parto Architecture 2.0 - Action-Driven Searchable Command Palette (Ctrl+Shift+P)
 Author: Ali Kamrani (MRThugh)
+
+Provides quick keyboard discovery and execution across all registered actions.
+Supports Action objects with rich search (name, description, category, shortcut)
+and backward-compatible tuple command lists.
 """
 
 from __future__ import annotations
-from typing import List, Tuple, Callable, Optional
+from typing import List, Tuple, Callable, Optional, Union, Any
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import (
@@ -19,24 +23,64 @@ from PySide6.QtWidgets import (
 
 
 class CommandPalette(QDialog):
-    """Quick-search command palette for fast keyboard access to all editor commands."""
+    """Quick-search command palette for fast keyboard access to all editor actions."""
 
     def __init__(
         self,
-        commands: List[Tuple[str, str, str, Callable[[], None]]],
+        commands: Optional[Union[List[Any], List[Tuple[str, str, str, Callable[[], None]]]]] = None,
         parent: Optional[QWidget] = None,
     ):
         """
-        commands: list of (action_id, display_name, shortcut_str, callback)
+        commands: list of Action objects or tuples (action_id, display_name, shortcut_str, callback)
         """
         super().__init__(parent)
         self.setWindowTitle("Command Palette — Parto")
         self.setModal(True)
-        self.setMinimumSize(480, 300)
-        self.resize(540, 340)
+        self.setMinimumSize(480, 320)
+        self.resize(560, 360)
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
 
-        self.commands = commands
+        # Normalize incoming commands into standardized descriptor entries
+        self._entries: List[Tuple[str, str, str, str, str, Callable[[], None]]] = []
+
+        if commands is None:
+            from ...actions.registry import get_action_registry
+            from ...actions.context import get_context_manager
+            reg = get_action_registry()
+            ctx_mgr = get_context_manager()
+            ctx = ctx_mgr.create_context()
+            for act in reg.get_all():
+                if act.is_enabled(ctx):
+                    self._entries.append((
+                        act.id,
+                        act.name,
+                        act.description,
+                        act.category,
+                        act.shortcut,
+                        lambda a=act, c=ctx: a.execute(c),
+                    ))
+        else:
+            for item in commands:
+                if hasattr(item, "id") and hasattr(item, "name"):
+                    # Action object
+                    from ...actions.context import get_context_manager
+                    ctx = get_context_manager().create_context()
+                    self._entries.append((
+                        item.id,
+                        item.name,
+                        getattr(item, "description", ""),
+                        getattr(item, "category", ""),
+                        getattr(item, "shortcut", ""),
+                        lambda a=item, c=ctx: a.execute(c),
+                    ))
+                elif isinstance(item, (tuple, list)) and len(item) == 4:
+                    # Tuple: (action_id, display_name, shortcut_str, callback)
+                    cid, name, sc, cb = item
+                    self._entries.append((cid, name, "", "", sc, cb))
+
+        self.commands = [
+            (eid, ename, esc, ecb) for (eid, ename, _, _, esc, ecb) in self._entries
+        ]
         self._filtered_indices: List[int] = []
 
         self._init_ui()
@@ -61,9 +105,25 @@ class CommandPalette(QDialog):
         self._filtered_indices.clear()
         q = query.lower().strip()
 
-        for idx, (cid, name, shortcut, _) in enumerate(self.commands):
-            if not q or q in name.lower() or q in shortcut.lower():
-                display_text = f"{name}    ({shortcut})" if shortcut else name
+        for idx, (cid, name, desc, cat, shortcut, _) in enumerate(self._entries):
+            matched = (
+                not q
+                or q in name.lower()
+                or q in desc.lower()
+                or q in cat.lower()
+                or q in cid.lower()
+                or (shortcut and q in shortcut.lower())
+            )
+            if matched:
+                parts = []
+                if cat:
+                    parts.append(f"[{cat}] ")
+                parts.append(name)
+                if shortcut:
+                    display_text = f"{''.join(parts):<40}    ({shortcut})"
+                else:
+                    display_text = ''.join(parts)
+
                 item = QListWidgetItem(display_text)
                 self.list_widget.addItem(item)
                 self._filtered_indices.append(idx)
@@ -75,7 +135,7 @@ class CommandPalette(QDialog):
         row = self.list_widget.currentRow()
         if 0 <= row < len(self._filtered_indices):
             original_idx = self._filtered_indices[row]
-            _, _, _, callback = self.commands[original_idx]
+            _, _, _, _, _, callback = self._entries[original_idx]
             self.accept()
             callback()
 

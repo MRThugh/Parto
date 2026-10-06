@@ -82,6 +82,14 @@ class MainWindow(QMainWindow):
         self.async_runner = AsyncOperationRunner(parent=self)
         self.preset_manager = BrushPresetManager()
 
+        # Action Architecture 2.0 Subsystem
+        from ..actions.registry import get_action_registry
+        from ..actions.builtins import register_all_builtins
+        from ..actions.context import get_context_manager
+        self.action_registry = get_action_registry()
+        register_all_builtins(self.action_registry)
+        get_context_manager().set_environment(self, self.document)
+
         # Interactive Tools
         self.tool_move = MoveTool()
         self.tool_crop = CropTool()
@@ -641,13 +649,9 @@ class MainWindow(QMainWindow):
 
     # Command Palette & Cheat Sheet
     def action_show_command_palette(self):
-        sm = get_shortcut_manager()
-        commands: List[Tuple[str, str, str, Callable[[], None]]] = []
-        for defn in sm.get_all():
-            if defn.action is not None:
-                commands.append((defn.action_id, defn.name, defn.key_sequence, defn.action.trigger))
-
-        dlg = CommandPalette(commands, self)
+        # Action-driven Command Palette with fallback to registered shortcuts
+        actions = self.action_registry.get_all() if hasattr(self, "action_registry") else None
+        dlg = CommandPalette(actions, self)
         dlg.exec()
 
     def action_show_shortcuts(self):

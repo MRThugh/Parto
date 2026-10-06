@@ -2,6 +2,7 @@
 """
 Parto Brush System — Document and LayerStack Integration Boundary
 Isolates brush engine and stroke controllers from Document internals.
+Integrates with Command Architecture 2.0 via PaintStrokeCommand.
 Author & Maintainer: Ali Kamrani (علی کامرانی)
 """
 
@@ -56,7 +57,7 @@ class BrushDocumentAdapter:
         operation_name: str,
     ) -> bool:
         """
-        Commit completed stroke to Document and History.
+        Commit completed stroke to Document and History using PaintStrokeCommand.
         Enforces strict no-op detection: returns True if pixels changed and history was recorded,
         or False if no actual pixel modification occurred.
         """
@@ -71,43 +72,23 @@ class BrushDocumentAdapter:
                 document.invalidate_composite()
             return False
 
-        # Ensure before_snapshot exists, creating from document if needed
-        if before_snapshot is None and document and hasattr(document, "_create_snapshot"):
-            before_snapshot = document._create_snapshot()
-
-        # Sync snapshot with exact pre-stroke layer image
-        if before_snapshot is not None and "layer_stack" in before_snapshot:
-            target_id = getattr(layer, "id", None)
-            target_name = getattr(layer, "name", None)
-            found = False
-            for lay in before_snapshot["layer_stack"]:
-                if (target_id and getattr(lay, "id", None) == target_id) or (target_name and getattr(lay, "name", None) == target_name):
-                    lay.image = before_layer_image.copy()
-                    found = True
-                    break
-            if not found and before_snapshot["layer_stack"].active_layer:
-                before_snapshot["layer_stack"].active_layer.image = before_layer_image.copy()
-
         # Mark document dirty
         if document and hasattr(document, "set_modified"):
             document.set_modified(True)
 
-        # Record undo/redo history operation
-        if document and hasattr(document, "_record_operation") and before_snapshot is not None:
-            document._record_operation(operation_name, before_snapshot)
-        elif document and hasattr(document, "history") and before_snapshot is not None:
-            from ..history.commands import SnapshotCommand
-            after_snap = document._create_snapshot() if hasattr(document, "_create_snapshot") else None
-            restore_func = getattr(document, "_restore_snapshot", lambda s: None)
-            document.history.push(
-                SnapshotCommand(
-                    operation_name,
-                    document,
-                    restore_func,
-                    before_snapshot,
-                    after_snap,
-                )
+        # Record undo/redo history operation using PaintStrokeCommand 2.0
+        if document and hasattr(document, "history") and document.history is not None:
+            from ..commands.brush import PaintStrokeCommand
+            stroke_cmd = PaintStrokeCommand(
+                target_document=document,
+                layer=layer,
+                before_image=before_layer_image,
+                after_image=layer.image,
+                name=operation_name,
             )
+            document.history.push(stroke_cmd)
+        elif document and hasattr(document, "_record_operation") and before_snapshot is not None:
+            document._record_operation(operation_name, before_snapshot)
 
         if document and hasattr(document, "invalidate_composite"):
             document.invalidate_composite()

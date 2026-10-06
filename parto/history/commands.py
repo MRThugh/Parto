@@ -1,7 +1,10 @@
 # parto/history/commands.py
 """
-Parto v0.3.0 - Undoable Command Architecture
+Parto Architecture 2.0 — History Commands & Backward Compatibility Shims
 Author: Ali Kamrani (MRThugh)
+
+Maintains backward-compatibility for legacy command classes while integrating
+directly with the modernized Command Architecture 2.0.
 """
 
 from __future__ import annotations
@@ -9,22 +12,9 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional
 from PIL import Image
 
-
-class Command(ABC):
-    """Abstract base class for all undoable operations."""
-
-    def __init__(self, name: str = "Action"):
-        self.name: str = name
-
-    @abstractmethod
-    def undo(self) -> None:
-        """Roll back the operation."""
-        pass
-
-    @abstractmethod
-    def redo(self) -> None:
-        """Re-apply the operation."""
-        pass
+# Import modernization bases from new command subsystem
+from ..commands.base import Command, MergeableCommand
+from ..commands.compound import CompoundCommand, TransactionCommand
 
 
 class SnapshotCommand(Command):
@@ -42,7 +32,7 @@ class SnapshotCommand(Command):
         before_state: Any,
         after_state: Any,
     ):
-        super().__init__(name)
+        super().__init__(name=name, id="snapshot_command", description=name)
         self.target_object = target_object
         self.restore_fn = restore_fn
         self.before_state = before_state
@@ -167,7 +157,7 @@ class LayerReorderCommand(Command):
         self._apply_order(self.new_order)
 
 
-# Domain-specific commands tested directly in test suite
+# Domain-specific commands tested directly in legacy test suite
 class AddLayerCommand(Command):
     def __init__(self, target: Any, layer: Any):
         super().__init__(f"Add {getattr(layer, 'name', 'Layer')}")
