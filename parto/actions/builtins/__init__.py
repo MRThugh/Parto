@@ -73,6 +73,19 @@ def register_all_builtins(registry: ActionRegistry) -> None:
         "tool_crop": "tool.crop",
         "tool_brush": "tool.brush",
         "tool_eyedropper": "tool.eyedropper",
+        "layer_new": "layer.create",
+        "layer_add": "layer.create",
+        "layer_dup": "layer.duplicate",
+        "layer_duplicate": "layer.duplicate",
+        "layer_del": "layer.delete",
+        "layer_delete": "layer.delete",
+        "layer_up": "layer.move_up",
+        "layer_dn": "layer.move_down",
+        "layer_down": "layer.move_down",
+        "layer_mrg": "layer.merge_down",
+        "layer_merge": "layer.merge_down",
+        "layer_visibility": "layer.toggle_visibility",
+        "layer_toggle_visibility": "layer.toggle_visibility",
     }
     for alias, canonical in aliases.items():
         registry.register_alias(alias, canonical)

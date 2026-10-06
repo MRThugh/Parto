@@ -40,6 +40,14 @@ class ActionManager(QObject):
             cls._instance = ActionManager()
         return cls._instance
 
+    def lookup(self, action_id: str) -> Optional[Action]:
+        """Look up an Action by ID or alias."""
+        return self.registry.get(action_id)
+
+    def get_action(self, action_id: str) -> Optional[Action]:
+        """Alias for lookup."""
+        return self.registry.get(action_id)
+
     def create_qaction(self, action_id: str, parent: Optional[QObject] = None) -> Optional[QAction]:
         """
         Create and return a QAction bound directly to the specified Action in ActionRegistry.
@@ -49,7 +57,14 @@ class ActionManager(QObject):
         if action is None:
             return None
 
-        # Reuse existing QAction if available and valid
+        canonical_id = action.id
+
+        # Reuse existing QAction if available
+        if canonical_id in self._qactions:
+            qact = self._qactions[canonical_id]
+            if action_id != canonical_id:
+                self._qactions[action_id] = qact
+            return qact
         if action_id in self._qactions:
             return self._qactions[action_id]
 
@@ -94,11 +109,36 @@ class ActionManager(QObject):
             action=qact,
         )
 
-        self._qactions[action.id] = qact
+        self._qactions[canonical_id] = qact
+        if action_id != canonical_id:
+            self._qactions[action_id] = qact
         return qact
 
     def get_qaction(self, action_id: str) -> Optional[QAction]:
-        return self._qactions.get(action_id)
+        """Retrieve existing QAction by canonical ID or alias."""
+        if action_id in self._qactions:
+            return self._qactions[action_id]
+        action = self.registry.get(action_id)
+        if action and action.id in self._qactions:
+            return self._qactions[action.id]
+        return None
+
+    def sync_shortcut(self, action_id: str, new_shortcut: str) -> bool:
+        """Update shortcut on Action, QAction, and ShortcutManager."""
+        action = self.registry.get(action_id)
+        if action is None:
+            return False
+        action.shortcut = new_shortcut
+        qact = self.get_qaction(action_id)
+        if qact is not None:
+            qact.setShortcut(QKeySequence(new_shortcut))
+            base_tip = action.description or action.name
+            if new_shortcut:
+                qact.setToolTip(f"{base_tip} ({new_shortcut})")
+            else:
+                qact.setToolTip(base_tip)
+        self.shortcut_mgr.set_shortcut(action.id, new_shortcut)
+        return True
 
     def trigger(self, action_id: str) -> Any:
         """Trigger an action by ID directly using current context."""
@@ -108,10 +148,24 @@ class ActionManager(QObject):
             return action.execute(ctx)
         return None
 
+    def sync_action_state(self, action_id: str) -> None:
+        """Update enabled and checked state of a specific QAction."""
+        qact = self.get_qaction(action_id)
+        action = self.registry.get(action_id)
+        if qact is not None and action is not None:
+            ctx = self.context_mgr.create_context()
+            qact.setEnabled(action.is_enabled(ctx))
+            if action.checkable:
+                qact.setChecked(action.is_checked(ctx))
+
     def update_states(self) -> None:
         """Evaluate enabled and checked states across all registered QActions."""
         ctx = self.context_mgr.create_context()
-        for action_id, qact in self._qactions.items():
+        seen = set()
+        for action_id, qact in list(self._qactions.items()):
+            if id(qact) in seen:
+                continue
+            seen.add(id(qact))
             action = self.registry.get(action_id)
             if action is not None:
                 qact.setEnabled(action.is_enabled(ctx))

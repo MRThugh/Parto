@@ -2,7 +2,13 @@
 
 **Author & Project Owner:** Ali Kamrani (MRThugh)  
 **System:** Parto (پرتو) — Lightweight Desktop Image Editor  
-**Version:** Architecture 2.0 (Action, Command & History Architecture)
+**Version:** Parto v0.3.1  
+**Status:** FINALIZED  
+
+```text
+PARTO ACTION + COMMAND + HISTORY ARCHITECTURE 2.0
+Status: FINALIZED
+```
 
 ---
 
@@ -219,4 +225,34 @@ To prevent regressions across existing test suites, Parto 2.0 provides compatibi
 * `parto.history.commands.SnapshotCommand` is preserved as a fallback checkpoint.
 * Legacy command classes (`LayerAddCommand`, `LayerDeleteCommand`, etc.) continue to exist in `parto.history.commands`.
 * `ShortcutManager` transparently resolves legacy IDs (`file_save`, `edit_undo`, `view_brush`, `brush_studio`) to Architecture 2.0 Action IDs.
-* `Document._record_operation` and `Document._create_snapshot` remain operational.
+* `Document._record_operation` and `Document._create_snapshot` remain operational for legacy tests and external callers.
+
+---
+
+## 6. Architecture 2.0 Final Closure Verification
+
+The final stabilization pass permanently closed all remaining migration bypasses in Parto v0.3.1:
+
+1. **Layers Panel Opacity Migration**:
+   * Removed manual `_opacity_snap` and `record_operation` bypass from `LayersDock`.
+   * Routed opacity changes through `ChangeLayerOpacityCommand` via `HistoryManager.execute()`.
+   * Added `seal()` support to `ChangeLayerOpacityCommand` to ensure continuous slider interactions coalesce into a single history entry while subsequent gestures create distinct entries.
+
+2. **Brush Snapshot Elimination & Memory Localized Buffering**:
+   * Removed full-document `_create_snapshot()` from normal `BrushDocumentAdapter.capture_pre_stroke` and `commit_stroke`.
+   * Brush strokes now store only the affected layer's pre- and post-stroke image buffers in `PaintStrokeCommand`.
+   * Unrelated layers in multi-layer documents are never duplicated or cloned.
+   * Byte-for-byte exact equality between initial/modified pixels verified across undo/redo cycles.
+
+3. **Transform Command History Ownership**:
+   * Geometric transforms (`RotateCommand`, `FlipCommand`, `ResizeCommand`, `CropCommand`) are fully encapsulated commands executed via `HistoryManager.execute()`.
+   * Controllers never manage or expose snapshot state for transform operations.
+
+4. **ActionManager Full Integration**:
+   * Initialized in `MainWindow` with `get_action_manager()`.
+   * Fully coordinates canonical Action lookups, legacy alias resolution, dynamic `QAction` generation, bidirectional state synchronization (`update_states`), shortcut synchronization (`sync_shortcut`), and direct trigger dispatch.
+   * Full Command Palette compatibility with search filtering and direct Action invocation.
+
+5. **Single Authoritative History Source of Truth**:
+   * `HistoryManager` is the sole authoritative history manager in Parto. No UI panel, controller, adapter, or tool maintains private undo/redo stacks.
+   * Dirty state (`is_clean`, `is_modified`) is strictly maintained across command executions, undos, redos, saves, and atomic transactions.

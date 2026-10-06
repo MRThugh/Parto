@@ -307,10 +307,16 @@ class ChangeLayerOpacityCommand(MergeableCommand):
         self.layer = layer
         self.old_opacity = float(old_opacity)
         self.new_opacity = float(new_opacity)
+        self._sealed: bool = False
+
+    def seal(self) -> None:
+        """Seal this command so subsequent adjustments create a new history entry."""
+        self._sealed = True
 
     def can_merge(self, other: Command) -> bool:
         return (
-            isinstance(other, ChangeLayerOpacityCommand)
+            not self._sealed
+            and isinstance(other, ChangeLayerOpacityCommand)
             and other.layer is self.layer
         )
 

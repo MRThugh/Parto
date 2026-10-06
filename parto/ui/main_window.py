@@ -86,9 +86,11 @@ class MainWindow(QMainWindow):
         from ..actions.registry import get_action_registry
         from ..actions.builtins import register_all_builtins
         from ..actions.context import get_context_manager
+        from ..actions.manager import get_action_manager
         self.action_registry = get_action_registry()
         register_all_builtins(self.action_registry)
         get_context_manager().set_environment(self, self.document)
+        self.action_manager = get_action_manager()
 
         # Interactive Tools
         self.tool_move = MoveTool()
@@ -324,6 +326,8 @@ class MainWindow(QMainWindow):
             self.statusbar.set_image_info(0, 0, "", "")
 
         self._update_window_title()
+        if hasattr(self, "action_manager"):
+            self.action_manager.update_states()
 
     def _update_window_title(self, *_: Any):
         fp = self.document.filepath
@@ -352,6 +356,9 @@ class MainWindow(QMainWindow):
         if hasattr(self, "tb_act_redo"):
             self.tb_act_redo.setEnabled(can_r)
             self.tb_act_redo.setToolTip(self.document.history.redo_description())
+
+        if hasattr(self, "action_manager"):
+            self.action_manager.update_states()
 
     def _on_pixel_inspected(self, x: int, y: int, r: int, g: int, b: int, a: int):
         self.statusbar.set_coordinates(x, y)

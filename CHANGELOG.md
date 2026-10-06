@@ -10,6 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Action + Command + History Architecture 2.0 Finalization**:
+  - Closed all remaining architectural bypasses and legacy snapshot execution paths across UI, Brush, and Transform domains.
+  - Added comprehensive integration tests (`test_architecture_20_closure.py`) validating layer opacity coalescing without snapshot creation, isolated layer brush strokes without document snapshot duplication, transform commands, shortcut/action execution consistency, dirty state tracking, and command palette integration.
+
+### Changed
+- **Layers Panel Opacity Workflow**:
+  - Replaced legacy `create_snapshot()` and `record_operation()` calls with authoritative `ChangeLayerOpacityCommand` routed through `HistoryManager.execute()`.
+  - Implemented slider drag session tracking to coalesce fine-grained opacity adjustments into a single undo/redo history step while maintaining non-drag atomicity.
+- **Brush Stroke Memory Isolation**:
+  - Eliminated full-document snapshotting during normal brush stroke lifecycle in `BrushDocumentAdapter`.
+  - Optimized stroke history state to isolate only the affected layer's before/after raster images, verifying byte-for-byte pixel integrity across Undo and Redo operations.
+- **Transform Command History Encapsulation**:
+  - Streamlined `TransformCommand` execution, fully encapsulating snapshot and boundary state inside domain commands and removing controller-level transaction leaks.
+- **Action Manager and Pipeline Harmonization**:
+  - Ensured all keyboard shortcuts and Command Palette entries route through `ActionManager` and `DocumentController` / `HistoryManager`, strictly adhering to the Architecture 2.0 unidirectional pipeline.
+
+### Fixed
+- **Architectural Snapshot Bypasses**:
+  - Removed deprecated snapshot history bypass mechanisms from layer opacity and stroke controllers.
+
 - **Modular Document Domain Subsystem (`parto/document/`)**:
   - Independent, engineering-grade domain architecture separating document state, transformation engines, compositing, persistence, transactions, and presentations.
   - Dedicated state model (`DocumentState`) managing canvas dimensions, file path, modified tracking, and authoritative `LayerStack` ownership.

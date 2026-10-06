@@ -35,7 +35,8 @@ class BrushDocumentAdapter:
     @staticmethod
     def capture_pre_stroke(document: Optional[Any], layer: Optional[Any]) -> Tuple[Optional[Image.Image], Optional[Any]]:
         """
-        Capture pre-stroke layer image buffer and complete document snapshot.
+        Capture pre-stroke layer image buffer without full document snapshot.
+        Guarantees localized memory footprint on affected layer only.
         """
         layer_image: Optional[Image.Image] = None
         snapshot: Optional[Any] = None
@@ -43,7 +44,9 @@ class BrushDocumentAdapter:
         if layer and hasattr(layer, "image") and layer.image is not None:
             layer_image = layer.image.copy()
 
-        if document and hasattr(document, "_create_snapshot"):
+        # Architecture 2.0: Normal brush path uses PaintStrokeCommand and does NOT capture
+        # full document snapshots. Snapshot is only captured for legacy documents lacking HistoryManager.
+        if document and not hasattr(document, "history") and hasattr(document, "_create_snapshot"):
             snapshot = document._create_snapshot()
 
         return layer_image, snapshot
@@ -100,13 +103,12 @@ class BrushDocumentAdapter:
         document: Optional[Any],
         layer: Optional[Any],
         before_layer_image: Optional[Image.Image],
-        before_snapshot: Optional[Any],
+        before_snapshot: Optional[Any] = None,
     ) -> None:
         """Restore document and layer to state prior to stroke start."""
         if layer and before_layer_image and hasattr(layer, "image"):
             layer.image = before_layer_image.copy()
-
-        if document and before_snapshot is not None and hasattr(document, "_restore_snapshot"):
+        elif document and before_snapshot is not None and hasattr(document, "_restore_snapshot"):
             document._restore_snapshot(before_snapshot)
 
         if document and hasattr(document, "invalidate_composite"):

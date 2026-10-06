@@ -12,6 +12,12 @@
 
 ## Architectural Highlights
 
+- **Action + Command + History Architecture 2.0 Finalization**:
+  - Full consolidation and enforcement of the standard production pipeline: `User Interface -> Action Subsystem -> Controller / Facade -> Command Subsystem -> History Subsystem -> Domain Model`.
+  - **Eliminated Snapshot Bypasses**: Removed legacy `create_snapshot()` and `record_operation()` bypasses from `LayersPanel`, routing continuous layer opacity through `ChangeLayerOpacityCommand` with seamless history coalescing.
+  - **Isolated Layer Brush Strokes**: Replaced whole-document snapshots in `BrushDocumentAdapter` with layer-isolated state capturing (`before_image` and `after_image`), preserving byte-for-byte fidelity across Undo/Redo cycles without memory bloat.
+  - **Encapsulated Transform History**: Replaced ad-hoc controller snapshots with encapsulated `TransformCommand`, ensuring state and dirty tracking remain strictly consistent.
+  - **Standardized Invocation Paths**: Unified keyboard shortcuts and Command Palette invocations through `ActionManager` and authoritative `DocumentController` / `HistoryManager` pathways.
 - **Modular Document Domain Subsystem (`parto/document/`)**:
   - Independent, engineering-grade domain architecture separating state, engines, persistence, transactions, and presentation.
   - **State Model (`DocumentState`)**: Authoritative container managing canvas dimensions, file path, modified tracking, and layer stack ownership.

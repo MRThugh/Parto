@@ -56,6 +56,17 @@ class ShortcutManager:
             cls._instance = ShortcutManager()
         return cls._instance
 
+    def _canonical_id(self, action_id: str) -> str:
+        """Return canonical Action ID from ActionRegistry if available."""
+        if action_id == "view_brush":
+            return "brush.toggle_studio"
+        try:
+            from ..actions.registry import get_action_registry
+            reg = get_action_registry()
+            return reg._aliases.get(action_id, action_id)
+        except Exception:
+            return action_id
+
     def _resolve_id(self, action_id: str) -> str:
         """Resolve legacy or aliased action IDs using ActionRegistry if available."""
         if action_id in self._shortcuts:
@@ -68,7 +79,6 @@ class ShortcutManager:
             canonical = reg._aliases.get(action_id)
             if canonical and canonical in self._shortcuts:
                 return canonical
-            # Reverse lookup alias
             for alias, target in reg._aliases.items():
                 if target == action_id and alias in self._shortcuts:
                     return alias
@@ -93,12 +103,12 @@ class ShortcutManager:
             self._default_shortcuts[action_id] = key_sequence
         active_policy = policy or self.default_policy
 
-        # Detect conflicts if key_sequence already in use
+        # Detect conflicts if key_sequence already in use by a distinct canonical action
         if key_sequence:
             norm_new = key_sequence.strip().lower()
             conflicting_ids = [
                 existing_id for existing_id, existing_defn in self._shortcuts.items()
-                if existing_id != action_id
+                if self._canonical_id(existing_id) != self._canonical_id(action_id)
                 and existing_defn.key_sequence
                 and existing_defn.key_sequence.strip().lower() == norm_new
             ]
@@ -247,14 +257,23 @@ class ShortcutManager:
                 defn.action.setToolTip(defn.description or defn.name)
         return True
 
+    def set_shortcut(self, action_id: str, new_key_sequence: str, policy: Optional[str] = None) -> bool:
+        """Convenience alias for remap_shortcut."""
+        return self.remap_shortcut(action_id, new_key_sequence, policy=policy)
+
     def find_conflicts(self) -> Dict[str, List[str]]:
-        """Return any duplicated keyboard shortcuts."""
+        """Return any duplicated keyboard shortcuts across distinct canonical actions."""
         seen: Dict[str, List[str]] = {}
         for action_id, defn in self._shortcuts.items():
             if defn.key_sequence:
                 norm = defn.key_sequence.strip().lower()
                 seen.setdefault(norm, []).append(action_id)
-        return {k: v for k, v in seen.items() if len(v) > 1}
+        conflicts = {}
+        for k, v in seen.items():
+            canonical_owners = {self._canonical_id(aid) for aid in v}
+            if len(canonical_owners) > 1:
+                conflicts[k] = v
+        return conflicts
 
     def assert_no_conflicts(self) -> bool:
         """Validate that there are zero shortcut collisions in the registry."""
