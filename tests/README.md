@@ -23,10 +23,12 @@ tests/
 │   ├── test_image_operations.py      # Transforms, photographic filters & color adjustments
 │   ├── test_import_export.py         # Format saving (PNG, JPEG, WebP, BMP, TIFF)
 │   ├── test_icons.py                 # Vector icon renderers, cache & alias resolution
+│   ├── test_localization_core.py     # Localization catalog, validation, fallback, atomicity
 │   └── test_version_consistency.py   # Repository-wide version audit & attribution checks
 ├── integration/                      # End-to-end multi-component workflows
 │   ├── test_layer_workflows.py       # Multi-layer authoring, duplication & export
 │   ├── test_editing_workflows.py     # Adjustments, transforms, undo & redo chain
+│   ├── test_locale_state_preservation.py # Editor state preservation during language switch
 │   ├── test_save_reload.py           # Disk roundtrip fidelity & modified state reset
 │   └── test_application_startup.py   # Application bootstrap, High-DPI & dock defaults
 ├── regression/                       # Verified bug fixes & regression guards
@@ -67,7 +69,9 @@ tests/
 When running in headless container environments or CI runners without an active X11 display server, ensure the following native packages are installed:
 ```bash
 sudo apt-get update && sudo apt-get install -y \
-    libegl1 libgl1 libxkbcommon-x11-0 libfontconfig1 libdbus-1-3
+    libegl1 libgl1 libxkbcommon-x11-0 libfontconfig1 libdbus-1-3 \
+    libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+    libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xfixes0 libxcb-xinerama0
 ```
 
 ---
@@ -78,6 +82,18 @@ sudo apt-get update && sudo apt-get install -y \
 From the project root:
 ```bash
 QT_QPA_PLATFORM=offscreen pytest
+```
+
+### Running Localization Test Suites
+```bash
+# Localization Core Unit Tests (Catalogs, validation, formatting, fallback, failure-paths)
+QT_QPA_PLATFORM=offscreen pytest tests/unit/test_localization_core.py -v
+
+# Editor State Preservation Integration Tests (Document, layers, history, brush, zoom, theme)
+QT_QPA_PLATFORM=offscreen pytest tests/integration/test_locale_state_preservation.py -v
+
+# Run All Localization Tests Combined
+QT_QPA_PLATFORM=offscreen pytest tests/unit/test_localization_core.py tests/integration/test_locale_state_preservation.py -v
 ```
 
 ### Running by Category

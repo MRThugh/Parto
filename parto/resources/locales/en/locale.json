@@ -183,6 +183,7 @@
     "toast.bg_removed": "Background removed",
     "toast.theme_switched": "Theme: {theme}",
     "toast.language_switched": "Language changed to {language}",
+    "toast.language_switched_not_saved": "Language changed to {language} (settings not saved)",
 
     "dialog.common.close": "Close",
     "dialog.common.cancel": "Cancel",

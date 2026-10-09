@@ -51,10 +51,18 @@
 - **Dynamic Theming & 200ms Crossfade Transitions**:
   - 5 curated palettes: **Dark**, **Light**, **Graphite**, **Midnight**, and **Nord**.
   - Smooth 200ms crossfade animation (`transition_theme`) using `QGraphicsOpacityEffect` and `QPropertyAnimation`.
+- **Localization Core Subsystem (`parto/localization/`, `docs/LOCALIZATION.md`)**:
+  - Independent, UI-decoupled internationalization service managing runtime locale switching, catalog discovery, translation fallback chains, and layout direction synchronization.
+  - Bundled factory catalogs for **English** (LTR) and **Persian / فارسی** (RTL), each with 191 verified translation keys and zero placeholder discrepancies.
+  - Dynamic layout direction synchronization updating `QApplication.setLayoutDirection` and top-level windows (`Qt.LeftToRight` $\leftrightarrow$ `Qt.RightToLeft`).
+  - Atomic runtime switching: validates candidate catalogs prior to commit, preserving previous valid locale and text direction if candidate validation fails.
+  - State preservation: language changes update UI texts without disturbing document identity, unsaved modifications, layer stacks, undo/redo history, brush settings, zoom factors, or active themes.
+  - Subscriber and UI refresh isolation: exceptions in individual widget retranslation callbacks are isolated and recorded in diagnostics without aborting other subscribers.
+  - Future Intent Subsystem integration contract via `format_intent_response()` allowing headless background tasks and future automation agents to obtain localized messages in arbitrary target languages.
 - **High-DPI Vector Icon System**:
   - Resolution-independent icons rendered via `QPainter` paths with canonical alias normalization.
-- **Robust 297-Test Automated Verification**:
-  - 297 automated tests validating document state isolation, transform engines, compositing, storage adapters, brush studio properties, presets, dab generation, layers, command history, shortcuts, and theme palettes.
+- **Robust 357-Test Automated Verification**:
+  - 357 automated tests validating document state isolation, transform engines, compositing, storage adapters, brush studio properties, presets, dab generation, layers, command history, shortcuts, localization catalogs, failure rollback, state preservation, and theme palettes.
 
 ---
 
@@ -280,12 +288,19 @@ Parto features a normalized, zero-conflict shortcut system registered through `S
 
 ## Testing
 
-Parto includes a comprehensive automated test suite with **297 tests** covering all image processing routines, document state isolation, transform engines, compositing, storage adapters, brush studio properties, dab generation, presets, layers, command history, dialogs, format conversions, and theme transitions.
+Parto includes a comprehensive automated test suite with **357 tests** covering all image processing routines, document state isolation, transform engines, compositing, storage adapters, brush studio properties, dab generation, presets, layers, command history, dialogs, format conversions, localization catalogs, failure rollback, state preservation, and theme transitions.
 
 Run the test suite using pytest:
 
 ```bash
+# Run full regression suite (357 tests)
 QT_QPA_PLATFORM=offscreen pytest
+
+# Run localization core unit tests (26 tests)
+QT_QPA_PLATFORM=offscreen pytest tests/unit/test_localization_core.py -v
+
+# Run editor state preservation integration tests (2 tests)
+QT_QPA_PLATFORM=offscreen pytest tests/integration/test_locale_state_preservation.py -v
 ```
 
 ---

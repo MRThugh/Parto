@@ -351,38 +351,72 @@ class MainWindow(QMainWindow):
         """
         Handle dynamic runtime language switch:
         - Update application and window layout directions (LTR <-> RTL)
-        - Refresh window title and all UI component texts
+        - Refresh window title and all UI component texts with subscriber isolation
         - Preserves all document, canvas, layers, history, tool, and theme state
         """
         from ..localization import t
         is_rtl = self.localization_manager.is_rtl
         target_dir = Qt.RightToLeft if is_rtl else Qt.LeftToRight
-        self.setLayoutDirection(target_dir)
+        try:
+            self.setLayoutDirection(target_dir)
+        except Exception as e:
+            logger.error(f"Error updating window layout direction: {e}")
 
-        self._update_window_title()
+        try:
+            self._update_window_title()
+        except Exception as e:
+            logger.error(f"Error updating window title: {e}")
 
-        if hasattr(self, "toolbar") and hasattr(self.toolbar, "retranslate_ui"):
-            self.toolbar.retranslate_ui()
-        if hasattr(self, "statusbar") and hasattr(self.statusbar, "retranslate_ui"):
-            self.statusbar.retranslate_ui()
-        if hasattr(self, "welcome_screen") and hasattr(self.welcome_screen, "retranslate_ui"):
-            self.welcome_screen.retranslate_ui()
-        if hasattr(self, "crop_bar") and hasattr(self.crop_bar, "retranslate_ui"):
-            self.crop_bar.retranslate_ui()
-        if hasattr(self, "brush_bar") and hasattr(self.brush_bar, "retranslate_ui"):
-            self.brush_bar.retranslate_ui()
-        if hasattr(self, "layers_dock") and hasattr(self.layers_dock, "retranslate_ui"):
-            self.layers_dock.retranslate_ui()
-        if hasattr(self, "adjustments_dock") and hasattr(self.adjustments_dock, "retranslate_ui"):
-            self.adjustments_dock.retranslate_ui()
-        if hasattr(self, "brush_dock") and hasattr(self.brush_dock, "retranslate_ui"):
-            self.brush_dock.retranslate_ui()
+        components = [
+            ("toolbar", getattr(self, "toolbar", None)),
+            ("statusbar", getattr(self, "statusbar", None)),
+            ("welcome_screen", getattr(self, "welcome_screen", None)),
+            ("crop_bar", getattr(self, "crop_bar", None)),
+            ("brush_bar", getattr(self, "brush_bar", None)),
+            ("layers_dock", getattr(self, "layers_dock", None)),
+            ("adjustments_dock", getattr(self, "adjustments_dock", None)),
+            ("brush_dock", getattr(self, "brush_dock", None)),
+        ]
 
-        EditorMenuBar.retranslate_menus(self.menuBar(), self)
+        refresh_errors = []
+        for name, comp in components:
+            if comp is not None and hasattr(comp, "retranslate_ui"):
+                try:
+                    comp.retranslate_ui()
+                except Exception as ce:
+                    logger.error(f"Error refreshing UI component '{name}': {ce}")
+                    refresh_errors.append((name, str(ce)))
+
+        try:
+            EditorMenuBar.retranslate_menus(self.menuBar(), self)
+        except Exception as me:
+            logger.error(f"Error refreshing menu bar: {me}")
+            refresh_errors.append(("menu_bar", str(me)))
+
+        if refresh_errors and hasattr(self.localization_manager, "_record_diagnostic"):
+            self.localization_manager._record_diagnostic(
+                "warning",
+                f"Incomplete UI refresh during locale switch to '{locale_id}': {refresh_errors}",
+                locale_id=locale_id,
+            )
 
         lang_name = self.localization_manager.current_metadata.native_name
         if hasattr(self, "toast"):
-            self.toast.show_message(t("toast.language_switched", language=lang_name, default=f"Language changed to {lang_name}"))
+            try:
+                if not getattr(self.localization_manager, "last_persistence_succeeded", True):
+                    self.toast.show_message(
+                        t("toast.language_switched_not_saved",
+                          language=lang_name,
+                          default=f"Language changed to {lang_name} (settings not saved)")
+                    )
+                else:
+                    self.toast.show_message(
+                        t("toast.language_switched",
+                          language=lang_name,
+                          default=f"Language changed to {lang_name}")
+                    )
+            except Exception as te:
+                logger.error(f"Error displaying language switch toast: {te}")
 
     def _update_history_actions(self):
         can_u = self.document.history.can_undo

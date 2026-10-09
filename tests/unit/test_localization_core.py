@@ -428,3 +428,173 @@ def test_future_intent_system_contract(clean_manager):
         command="generate_vector",
     )
     assert "generate_vector" in err_en
+
+
+# -----------------------------------------------------------------------------
+# 7. Failure-Path & Robustness Tests (Task Two)
+# -----------------------------------------------------------------------------
+
+def test_invalid_locale_id_does_not_corrupt_state(clean_manager):
+    """Invalid locale IDs must be rejected safely without modifying active state."""
+    clean_manager.set_locale("en", persist=False)
+    assert clean_manager.current_locale == "en"
+
+    for invalid_id in ["", "  ", None, "../../traversal", "invalid#id", "too_many_parts_in_id_foo_bar_baz"]:
+        result = clean_manager.set_locale(invalid_id, persist=False)
+        assert result is False
+        assert clean_manager.current_locale == "en"
+        assert clean_manager.direction == TextDirection.LTR
+        assert clean_manager.is_rtl is False
+
+    # Previous locale remains fully usable
+    assert clean_manager.translate("menu.file") == "&File"
+    diagnostics = clean_manager.get_diagnostics()
+    assert len(diagnostics) > 0
+
+
+def test_missing_catalog_does_not_change_active_locale(clean_manager):
+    """Requesting an unregistered/non-existent catalog must fail and preserve state."""
+    clean_manager.set_locale("en", persist=False)
+
+    assert clean_manager.set_locale("xx", persist=False) is False
+    assert clean_manager.current_locale == "en"
+    assert clean_manager.is_rtl is False
+    assert clean_manager.direction == TextDirection.LTR
+
+
+def test_malformed_candidate_catalog_does_not_replace_valid_catalog(clean_manager):
+    """A catalog that fails validation must be rejected and never activated."""
+    clean_manager.set_locale("en", persist=False)
+
+    # Create catalog with invalid empty ID
+    invalid_meta = LocaleMetadata(id="", name="Bad", native_name="Bad", direction=TextDirection.LTR)
+    invalid_cat = TranslationCatalog(metadata=invalid_meta, translations={"app.name": "Bad"})
+
+    # register_catalog should fail validation
+    reg_ok = clean_manager.register_catalog(invalid_cat)
+    assert reg_ok is False
+    assert clean_manager.current_locale == "en"
+
+
+def test_settings_persistence_failure_default_contract(clean_manager, monkeypatch):
+    """
+    Contract test: When persistence fails in default mode (strict_persistence=False),
+    the active session is successfully switched (returns True), but last_persistence_succeeded
+    is False and a diagnostic warning is logged.
+    """
+    clean_manager.set_locale("en", persist=False)
+
+    # Simulate filesystem write failure in LocalePreferences
+    def mock_set_preferred_locale(locale_id):
+        return False
+
+    monkeypatch.setattr(clean_manager._preferences, "set_preferred_locale", mock_set_preferred_locale)
+
+    result = clean_manager.set_locale("fa", persist=True, strict_persistence=False)
+    assert result is True
+    assert clean_manager.current_locale == "fa"
+    assert clean_manager.is_rtl is True
+    assert clean_manager.last_persistence_succeeded is False
+    assert clean_manager.last_persistence_error is not None
+
+    diagnostics = [d for d in clean_manager.get_diagnostics() if "Could not persist" in d.message]
+    assert len(diagnostics) >= 1
+
+
+def test_settings_persistence_failure_strict_contract(clean_manager, monkeypatch):
+    """
+    Contract test: When persistence fails in strict mode (strict_persistence=True),
+    the locale switch is rolled back to the previous locale and returns False.
+    """
+    clean_manager.set_locale("en", persist=False)
+
+    def mock_set_preferred_locale_raise(locale_id):
+        raise IOError("Disk quota exceeded")
+
+    monkeypatch.setattr(clean_manager._preferences, "set_preferred_locale", mock_set_preferred_locale_raise)
+
+    result = clean_manager.set_locale("fa", persist=True, strict_persistence=True)
+    assert result is False
+    # Verified rollback to previous working state
+    assert clean_manager.current_locale == "en"
+    assert clean_manager.is_rtl is False
+    assert clean_manager.direction == TextDirection.LTR
+    assert clean_manager.last_persistence_succeeded is False
+
+
+def test_listener_failure_isolation_and_reporting(clean_manager):
+    """
+    Subscriber isolation test: An unhandled exception in one subscriber callback
+    must not prevent subsequent subscribers from receiving notification, and
+    must record last_refresh_completed = False.
+    """
+    clean_manager.set_locale("en", persist=False)
+    delivered = []
+
+    def failing_listener(loc):
+        raise RuntimeError("Widget refresh failure simulation")
+
+    def successful_listener(loc):
+        delivered.append(loc)
+
+    clean_manager.add_locale_listener(failing_listener)
+    clean_manager.add_locale_listener(successful_listener)
+
+    # Switch language to Persian
+    result = clean_manager.set_locale("fa", persist=False)
+    assert result is True
+    assert clean_manager.current_locale == "fa"
+
+    # Successful listener was still called despite the failure in the previous listener
+    assert delivered == ["fa"]
+    assert clean_manager.last_refresh_completed is False
+    assert len(clean_manager.last_listener_failures) == 1
+    assert "Widget refresh failure simulation" in clean_manager.last_listener_failures[0]["error"]
+
+
+def test_repeated_switching_does_not_duplicate_subscriptions(clean_manager):
+    """Adding the same callback multiple times must not produce duplicate calls."""
+    calls = []
+
+    def test_callback(loc):
+        calls.append(loc)
+
+    clean_manager.add_locale_listener(test_callback)
+    clean_manager.add_locale_listener(test_callback)  # Duplicate registration
+
+    clean_manager.set_locale("fa", persist=False)
+    clean_manager.set_locale("en", persist=False)
+
+    assert calls == ["fa", "en"]
+
+
+def test_selecting_current_locale_is_idempotent_noop(clean_manager):
+    """Selecting the currently active locale returns True immediately as an idempotent no-op."""
+    clean_manager.set_locale("en", persist=False)
+    events = []
+
+    clean_manager.add_locale_listener(lambda l: events.append(l))
+
+    # Re-selecting current locale
+    result = clean_manager.set_locale("en", persist=False)
+    assert result is True
+    assert len(events) == 0  # No redundant notification dispatched
+    assert clean_manager.current_locale == "en"
+
+
+def test_previous_locale_remains_usable_after_failed_switch(clean_manager):
+    """When switching to an invalid locale fails, the previous locale remains 100% usable."""
+    clean_manager.set_locale("fa", persist=False)
+    assert clean_manager.current_locale == "fa"
+    assert clean_manager.is_rtl is True
+
+    # Failed switch attempt
+    res = clean_manager.set_locale("nonexistent_locale", persist=False)
+    assert res is False
+
+    # Previous active state must be untouched and fully functional
+    assert clean_manager.current_locale == "fa"
+    assert clean_manager.is_rtl is True
+    assert clean_manager.direction == TextDirection.RTL
+    assert clean_manager.translate("menu.file") == "پرونده"
+

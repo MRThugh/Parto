@@ -90,6 +90,10 @@ class LocalizationManager(_BaseEmitter):
         self._missing_keys: Set[str] = set()
         self._headless_listeners: List[Callable[[str], None]] = []
         self._is_switching: bool = False
+        self._last_persistence_succeeded: bool = True
+        self._last_persistence_error: Optional[str] = None
+        self._last_listener_failures: List[Dict[str, Any]] = []
+        self._last_refresh_completed: bool = True
 
         # Connect duplicate signal alias
         if _QT_AVAILABLE:
@@ -175,6 +179,26 @@ class LocalizationManager(_BaseEmitter):
     def is_rtl(self) -> bool:
         """True if active language is Right-to-Left (e.g. Persian)."""
         return self.direction == TextDirection.RTL
+
+    @property
+    def last_persistence_succeeded(self) -> bool:
+        """True if the most recent requested persistence operation completed successfully."""
+        return self._last_persistence_succeeded
+
+    @property
+    def last_persistence_error(self) -> Optional[str]:
+        """Error message from most recent failed persistence operation, or None."""
+        return self._last_persistence_error
+
+    @property
+    def last_listener_failures(self) -> List[Dict[str, Any]]:
+        """List of listener errors encountered during the last locale switch."""
+        return list(self._last_listener_failures)
+
+    @property
+    def last_refresh_completed(self) -> bool:
+        """True if all observers and callbacks completed without exception during the last switch."""
+        return self._last_refresh_completed
 
     def get_available_languages(self) -> List[LocaleMetadata]:
         """List of all validly registered and available language metadata."""
@@ -365,7 +389,12 @@ class LocalizationManager(_BaseEmitter):
     # Runtime Language Switching (Atomic & Safe)
     # -------------------------------------------------------------------------
 
-    def set_locale(self, locale_id: str, persist: bool = True) -> bool:
+    def set_locale(
+        self,
+        locale_id: str,
+        persist: bool = True,
+        strict_persistence: bool = False,
+    ) -> bool:
         """
         Switch active application language at runtime in an atomic, failure-safe transaction.
         
@@ -377,8 +406,14 @@ class LocalizationManager(_BaseEmitter):
         5. Validates candidate catalog metadata and translations before committing.
         6. If any validation stage fails, completely preserves previously active locale and direction.
         7. On commit: updates locale, direction, and broadcasts notifications safely.
-        8. Fault-tolerant persistence: disk write errors log diagnostics but do not corrupt runtime state.
-        9. Protects against failing listener callbacks breaking application flow.
+        8. Contract for persistence:
+           - Default (strict_persistence=False): Persistence is a non-critical post-commit side effect.
+             Disk write errors log diagnostics and set `last_persistence_succeeded = False`,
+             but do NOT invalidate or revert the running session. Returns True on activation.
+           - Strict mode (strict_persistence=True): Persistence failure causes transaction rollback
+             to the previous locale and returns False.
+        9. Subscriber isolation: Failure in one observer callback is recorded in `last_listener_failures`
+           and does not prevent other subscribers from receiving notifications.
         """
         if self._is_switching:
             logger.warning("Rejected recursive set_locale() invocation.")
@@ -426,6 +461,8 @@ class LocalizationManager(_BaseEmitter):
 
         old_locale = self._current_locale
         self._is_switching = True
+        self._last_listener_failures = []
+        self._last_refresh_completed = True
 
         try:
             # 1. Commit active locale identifier
@@ -438,30 +475,52 @@ class LocalizationManager(_BaseEmitter):
                     target_dir = Qt.RightToLeft if new_catalog.is_rtl else Qt.LeftToRight
                     app.setLayoutDirection(target_dir)
 
-            # 3. Persist user preference (non-destructive on I/O error)
+            # 3. Persist user preference
             if persist:
                 try:
                     persisted = self._preferences.set_preferred_locale(target_id)
                     if not persisted:
+                        self._last_persistence_succeeded = False
+                        self._last_persistence_error = f"Preferences adapter could not write '{target_id}'"
                         self._record_diagnostic("warning", f"Could not persist preference for '{target_id}' to disk", locale_id=target_id)
+                        if strict_persistence:
+                            raise IOError(self._last_persistence_error)
+                    else:
+                        self._last_persistence_succeeded = True
+                        self._last_persistence_error = None
                 except Exception as pe:
+                    self._last_persistence_succeeded = False
+                    self._last_persistence_error = str(pe)
                     self._record_diagnostic("warning", f"Disk I/O error persisting locale preference: {pe}", locale_id=target_id)
+                    if strict_persistence:
+                        raise
+            else:
+                self._last_persistence_succeeded = True
+                self._last_persistence_error = None
 
-            # 4. Broadcast Qt signals
+            # 4. Broadcast Qt signals safely
             if _QT_AVAILABLE:
                 try:
                     self.locale_changed.emit(target_id)
                 except Exception as se:
                     logger.error(f"Error during locale_changed signal emission: {se}")
                     self._record_diagnostic("warning", f"Signal emission warning: {se}", locale_id=target_id)
+                    self._last_refresh_completed = False
+                    self._last_listener_failures.append({"type": "qt_signal", "error": str(se)})
 
-            # 5. Notify headless observers safely
+            # 5. Notify headless observers safely with subscriber isolation
             for listener in list(self._headless_listeners):
                 try:
                     listener(target_id)
                 except Exception as e:
                     logger.error(f"Error in locale listener callback: {e}")
                     self._record_diagnostic("warning", f"Listener callback error: {e}", locale_id=target_id)
+                    self._last_refresh_completed = False
+                    self._last_listener_failures.append({
+                        "type": "headless_listener",
+                        "callback": getattr(listener, "__name__", repr(listener)),
+                        "error": str(e),
+                    })
 
             logger.info(f"Switched application locale from '{old_locale}' to '{target_id}'")
             return True
@@ -497,6 +556,11 @@ class LocalizationManager(_BaseEmitter):
         """Unregister a locale change callback."""
         if callback in self._headless_listeners:
             self._headless_listeners.remove(callback)
+
+    def clear_listeners(self) -> None:
+        """Clear all registered headless observers."""
+        self._headless_listeners.clear()
+        self._last_listener_failures.clear()
 
     # -------------------------------------------------------------------------
     # Diagnostics & Developer Introspection

@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Localization Core Remediation & Hardening (`parto/localization/`)**:
+  - Implemented transactional runtime locale switching with atomic rollback upon catalog validation or strict persistence failure.
+  - Defined explicit settings persistence failure contract: default resilient mode (`strict_persistence=False`) treats persistence failure as a non-fatal side effect while exposing `last_persistence_succeeded` and `last_persistence_error`; strict mode (`strict_persistence=True`) enforces atomic rollback.
+  - Implemented subscriber isolation for Qt signals and headless observer callbacks, tracking errors in `last_listener_failures` and `last_refresh_completed` without aborting other listeners.
+  - Added UI refresh subscriber isolation in `MainWindow._on_locale_changed` preventing single-widget failures from corrupting application retranslation.
+  - Added `toast.language_switched_not_saved` translation key to both English and Persian catalogs (191 verified keys each).
+  - Added comprehensive failure-path unit tests to `tests/unit/test_localization_core.py` covering invalid locale IDs, missing catalogs, malformed catalogs, persistence failures, subscriber isolation, and idempotent no-ops.
+  - Added end-to-end integration test suite `tests/integration/test_locale_state_preservation.py` verifying byte-for-byte preservation of document identity, dirty modification flag, layer stacks, undo/redo history, brush settings, active tools, zoom factors, and themes across language switches.
+  - Created comprehensive standalone developer guide `docs/LOCALIZATION.md` documenting architecture, schemas, extension workflows, and future Intent integration.
+
 - **Action + Command + History Architecture 2.0 Finalization**:
   - Closed all remaining architectural bypasses and legacy snapshot execution paths across UI, Brush, and Transform domains.
   - Added comprehensive integration tests (`test_architecture_20_closure.py`) validating layer opacity coalescing without snapshot creation, isolated layer brush strokes without document snapshot duplication, transform commands, shortcut/action execution consistency, dirty state tracking, and command palette integration.

@@ -183,6 +183,7 @@
     "toast.bg_removed": "پس‌زمینه حذف شد",
     "toast.theme_switched": "پوسته: {theme}",
     "toast.language_switched": "زبان به {language} تغییر یافت",
+    "toast.language_switched_not_saved": "زبان به {language} تغییر یافت (تنظیمات ذخیره نشد)",
 
     "dialog.common.close": "بستن",
     "dialog.common.cancel": "انصراف",

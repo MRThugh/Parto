@@ -256,3 +256,61 @@ The final stabilization pass permanently closed all remaining migration bypasses
 5. **Single Authoritative History Source of Truth**:
    * `HistoryManager` is the sole authoritative history manager in Parto. No UI panel, controller, adapter, or tool maintains private undo/redo stacks.
    * Dirty state (`is_clean`, `is_modified`) is strictly maintained across command executions, undos, redos, saves, and atomic transactions.
+
+---
+
+## 7. Localization Core Architecture (`parto/localization/`)
+
+Parto v0.4.0 establishes a robust, decoupled, and failure-tolerant internationalization and localization architecture.
+
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│                          LOCALIZATION SERVICE                          │
+│                                                                        │
+│   ┌─────────────────────┐               ┌──────────────────────────┐   │
+│   │ LanguageCatalog     │  Discover &   │   TranslationCatalog     │   │
+│   │     Loader          │ ────────────> │  (Metadata & Entries)    │   │
+│   └─────────────────────┘   Validate    └──────────────────────────┘   │
+│                                                      │                 │
+│                                                      ▼                 │
+│   ┌────────────────────────────────────────────────────────────────┐   │
+│   │                    LocalizationManager                         │   │
+│   │   - Active Locale & Fallback Chain ('fa' -> 'en' -> default)   │   │
+│   │   - Layout Direction Synchronization (LTR <-> RTL)             │   │
+│   │   - Future Intent Subsystem Contract (format_intent_response)  │   │
+│   └────────────────────────────────────────────────────────────────┘   │
+│                 │                                │                     │
+│                 ▼                                ▼                     │
+│   ┌───────────────────────────┐    ┌───────────────────────────────┐   │
+│   │    LocalePreferences      │    │       Subscriber Isolation    │   │
+│   │ (Atomic Disk Persistence) │    │  (Qt Signals & Observers)     │   │
+│   └───────────────────────────┘    └───────────────────────────────┘   │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### 7.1 Architecture Components
+
+1. **`LocalizationManager` (`parto/localization/manager.py`)**:
+   - Central singleton service coordinating active language selection, catalog registry, translation lookup, layout direction, and observer notifications.
+   - Decoupled from UI widgets; fully usable in headless environments and background workers.
+2. **`TranslationCatalog` (`parto/localization/catalog.py`)**:
+   - Pure domain model encapsulating catalog metadata (BCP 47 identifier, native name, text direction, version) and dictionary of translation keys.
+   - Implements strict validation: ensures non-empty IDs, valid schema versions, and rejection of malformed translation types.
+3. **`LanguageCatalogLoader` (`parto/localization/loader.py`)**:
+   - Discovers catalogs across bundled package paths (`parto/resources/locales/`) and user directories (`~/.parto/locales/`).
+   - Safely parses JSON files without code execution risks and logs diagnostics for corrupted files.
+4. **`safe_interpolate` & Formatter (`parto/localization/formatting.py`)**:
+   - Regex-based named placeholder interpolation without `eval()` or code execution.
+   - Tolerant of missing parameters (retains unresolved `{param}` placeholders while returning diagnostic missing sets).
+   - Cardinal pluralization engine supporting English (`one`, `other`) and Persian (`one` for 0–1, `other` for $\ge 2$).
+5. **`LocalePreferences` (`parto/localization/persistence.py`)**:
+   - Atomic disk persistence using temporary file writing and atomic replace (`os.replace`).
+   - Resilient against corrupted configuration files and read-only storage.
+6. **Layout Direction Synchronization**:
+   - Automatically synchronizes application layout direction (`QApplication.setLayoutDirection`) and window layout directions between `Qt.LeftToRight` (English) and `Qt.RightToLeft` (Persian).
+7. **Subscriber Isolation & Error Recovery**:
+   - Observers are invoked inside isolated `try...except` blocks. An exception in one widget retranslation callback is recorded in `last_listener_failures` and does not prevent other widgets from updating.
+   - Persistence failures in default mode (`strict_persistence=False`) are non-fatal side effects; the active session remains in the requested language and UI toast alerts the user that settings were not saved.
+8. **Future Intent Subsystem Integration Contract**:
+   - Exposes `format_intent_response(key, locale=None, **kwargs)` for headless CLI, scripts, and future intent automation without UI dependencies.
+
