@@ -10,6 +10,7 @@ import os
 import json
 import logging
 from typing import Optional
+from .models import is_valid_locale_id
 
 logger = logging.getLogger("parto.localization.persistence")
 
@@ -31,7 +32,7 @@ def get_default_settings_path() -> str:
 class LocalePreferences:
     """
     Persistence adapter for locale preference.
-    Resilient against disk write failures or file corruption.
+    Resilient against disk write failures, path traversal, or file corruption.
     """
 
     def __init__(self, filepath: Optional[str] = None):
@@ -47,7 +48,7 @@ class LocalePreferences:
                 data = json.load(f)
             if isinstance(data, dict):
                 locale = data.get("locale")
-                if locale and isinstance(locale, str) and locale.strip():
+                if locale and isinstance(locale, str) and is_valid_locale_id(locale.strip()):
                     return locale.strip()
         except Exception as e:
             logger.warning(f"Could not read locale preference from {self.filepath}: {e}")
@@ -56,6 +57,9 @@ class LocalePreferences:
 
     def set_preferred_locale(self, locale_id: str) -> bool:
         """Save preferred locale code to settings file."""
+        if not is_valid_locale_id(locale_id):
+            logger.warning(f"Refused to persist invalid locale identifier: {locale_id!r}")
+            return False
         try:
             folder = os.path.dirname(self.filepath)
             if folder:

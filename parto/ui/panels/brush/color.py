@@ -213,3 +213,10 @@ class BrushColorSection(QWidget):
         self.settings.set_color(rgba)
         self.sync_from_settings()
         self.color_changed.emit(rgba)
+
+    def retranslate_ui(self) -> None:
+        """Update color section header and button tooltips with active language."""
+        from parto.localization import t
+        self.section.set_title(t("brush.studio.color_title", default="Color"))
+        self.btn_swap.setToolTip(t("brush.bar.swap_colors", default="Swap Foreground and Background (X)"))
+        self.btn_reset.setToolTip(t("brush.bar.reset_colors", default="Reset to Default Black / White (D)"))

@@ -89,6 +89,10 @@ class CollapsibleSection(QWidget):
         self.content_widget.setVisible(not collapsed)
         self.toggled.emit(collapsed)
 
+    def set_title(self, title: str) -> None:
+        """Update section header title text."""
+        self.lbl_title.setText(str(title).upper())
+
     def is_collapsed(self) -> bool:
         return self._collapsed
 

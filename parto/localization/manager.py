@@ -23,6 +23,7 @@ from .models import (
     LocaleMetadata,
     TextDirection,
     DiagnosticRecord,
+    is_valid_locale_id,
 )
 from .catalog import TranslationCatalog
 from .loader import LanguageCatalogLoader
@@ -48,7 +49,7 @@ else:
             def __init__(self, owner):
                 self._owner = owner
             def emit(self, val):
-                for l in self._owner._listeners:
+                for l in list(self._owner._listeners):
                     try:
                         l(val)
                     except Exception:
@@ -81,12 +82,14 @@ class LocalizationManager(_BaseEmitter):
     def __init__(self, parent: Optional[Any] = None):
         super().__init__(parent)
         self._catalogs: Dict[str, TranslationCatalog] = {}
+        self._discovery_directories: List[str] = []
         self._current_locale: str = "en"
         self._fallback_locale: str = "en"
         self._preferences = LocalePreferences()
         self._diagnostics: List[DiagnosticRecord] = []
         self._missing_keys: Set[str] = set()
         self._headless_listeners: List[Callable[[str], None]] = []
+        self._is_switching: bool = False
 
         # Connect duplicate signal alias
         if _QT_AVAILABLE:
@@ -116,7 +119,15 @@ class LocalizationManager(_BaseEmitter):
         here = os.path.dirname(os.path.abspath(__file__))
         parto_root = os.path.dirname(here)
         bundled_locales_dir = os.path.join(parto_root, "resources", "locales")
-        self.discover_locales(bundled_locales_dir)
+        self.add_catalog_directory(bundled_locales_dir)
+
+    def add_catalog_directory(self, directory: str) -> None:
+        """Register an additional directory for automatic catalog discovery."""
+        if directory and os.path.isdir(directory):
+            abs_dir = os.path.abspath(directory)
+            if abs_dir not in self._discovery_directories:
+                self._discovery_directories.append(abs_dir)
+            self.discover_locales(abs_dir)
 
     # -------------------------------------------------------------------------
     # Properties & Metadata
@@ -356,64 +367,107 @@ class LocalizationManager(_BaseEmitter):
 
     def set_locale(self, locale_id: str, persist: bool = True) -> bool:
         """
-        Switch active application language at runtime.
+        Switch active application language at runtime in an atomic, failure-safe transaction.
         
-        Atomicity guarantees:
-        - Validates requested locale is registered and valid.
-        - If validation fails, retains previous working locale untouched.
-        - Updates text direction and notifies all observers.
-        - Persists choice if requested.
+        Atomicity & Safety guarantees:
+        1. Validates requested identifier conforms to BCP 47 and has no path traversal.
+        2. Idempotent: No-op if requested locale is already active.
+        3. Prevents recursive switching via re-entrancy guard.
+        4. Dynamically attempts catalog discovery if not currently in memory.
+        5. Validates candidate catalog metadata and translations before committing.
+        6. If any validation stage fails, completely preserves previously active locale and direction.
+        7. On commit: updates locale, direction, and broadcasts notifications safely.
+        8. Fault-tolerant persistence: disk write errors log diagnostics but do not corrupt runtime state.
+        9. Protects against failing listener callbacks breaking application flow.
         """
+        if self._is_switching:
+            logger.warning("Rejected recursive set_locale() invocation.")
+            return False
+
         if not locale_id or not isinstance(locale_id, str):
             logger.warning(f"Invalid locale identifier requested: {locale_id!r}")
+            self._record_diagnostic("error", f"Invalid locale identifier requested: {locale_id!r}", locale_id=str(locale_id))
             return False
 
         target_id = locale_id.strip()
+
+        if not is_valid_locale_id(target_id):
+            msg = f"Invalid or malformed locale identifier format: {target_id!r}"
+            self._record_diagnostic("error", msg, locale_id=target_id)
+            logger.warning(msg)
+            return False
 
         # No-op if already active
         if target_id == self._current_locale:
             return True
 
-        # Validate target catalog
+        # If not yet registered, attempt discovery across registered directories
+        if target_id not in self._catalogs:
+            if self._discovery_directories:
+                discovered = LanguageCatalogLoader.discover_catalogs(self._discovery_directories)
+                for cat in discovered.values():
+                    if cat.id not in self._catalogs:
+                        self.register_catalog(cat)
+
+        # Validate target catalog existence
         if target_id not in self._catalogs:
             msg = f"Requested locale '{target_id}' is not available in registered catalogs."
             self._record_diagnostic("error", msg, locale_id=target_id)
             logger.warning(msg)
             return False
 
-        old_locale = self._current_locale
         new_catalog = self._catalogs[target_id]
+        validation_errors = new_catalog.validate()
+        if validation_errors:
+            msg = f"Candidate catalog '{target_id}' failed validation: {'; '.join(validation_errors)}"
+            self._record_diagnostic("error", msg, locale_id=target_id)
+            logger.warning(msg)
+            return False
+
+        old_locale = self._current_locale
+        self._is_switching = True
 
         try:
-            # Commit new locale
+            # 1. Commit active locale identifier
             self._current_locale = target_id
 
-            # Apply layout direction to Qt application if running
+            # 2. Synchronize layout direction with QApplication if available
             if _QT_AVAILABLE:
                 app = QApplication.instance()
                 if app is not None:
                     target_dir = Qt.RightToLeft if new_catalog.is_rtl else Qt.LeftToRight
                     app.setLayoutDirection(target_dir)
 
-            # Persist preference
+            # 3. Persist user preference (non-destructive on I/O error)
             if persist:
-                self._preferences.set_preferred_locale(target_id)
+                try:
+                    persisted = self._preferences.set_preferred_locale(target_id)
+                    if not persisted:
+                        self._record_diagnostic("warning", f"Could not persist preference for '{target_id}' to disk", locale_id=target_id)
+                except Exception as pe:
+                    self._record_diagnostic("warning", f"Disk I/O error persisting locale preference: {pe}", locale_id=target_id)
 
-            # Broadcast language change
-            self.locale_changed.emit(target_id)
+            # 4. Broadcast Qt signals
+            if _QT_AVAILABLE:
+                try:
+                    self.locale_changed.emit(target_id)
+                except Exception as se:
+                    logger.error(f"Error during locale_changed signal emission: {se}")
+                    self._record_diagnostic("warning", f"Signal emission warning: {se}", locale_id=target_id)
 
-            # Notify headless listeners
+            # 5. Notify headless observers safely
             for listener in list(self._headless_listeners):
                 try:
                     listener(target_id)
                 except Exception as e:
                     logger.error(f"Error in locale listener callback: {e}")
+                    self._record_diagnostic("warning", f"Listener callback error: {e}", locale_id=target_id)
 
             logger.info(f"Switched application locale from '{old_locale}' to '{target_id}'")
             return True
 
         except Exception as e:
-            # Rollback to old locale atomically
+            # Atomic rollback to previous working locale and direction
             self._current_locale = old_locale
             if _QT_AVAILABLE:
                 app = QApplication.instance()
@@ -422,10 +476,13 @@ class LocalizationManager(_BaseEmitter):
                     if old_cat:
                         app.setLayoutDirection(Qt.RightToLeft if old_cat.is_rtl else Qt.LeftToRight)
 
-            msg = f"Atomic rollback: Failed to switch locale to '{target_id}': {e}"
+            msg = f"Atomic rollback: Failed to commit locale switch to '{target_id}': {e}"
             self._record_diagnostic("error", msg, locale_id=target_id)
             logger.error(msg)
             return False
+
+        finally:
+            self._is_switching = False
 
     # -------------------------------------------------------------------------
     # Observers & Listeners

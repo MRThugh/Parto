@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 from parto.image.filters import apply_filter, SUPPORTED_FILTERS
 from parto.utils.conversions import pil_to_qpixmap
+from parto.localization import t
 
 
 class FilterDialog(QDialog):
@@ -31,7 +32,7 @@ class FilterDialog(QDialog):
 
     def __init__(self, source_image: Image.Image, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.setWindowTitle("Filter Gallery — Parto")
+        self.setWindowTitle(t("dialog.filter.title", default="Filter Gallery — Parto"))
         self.setModal(True)
         self.setMinimumSize(540, 400)
         self.resize(600, 440)
@@ -55,13 +56,14 @@ class FilterDialog(QDialog):
         left_layout = QVBoxLayout()
         left_layout.setSpacing(8)
 
-        list_label = QLabel("Available Filters:", self)
+        list_label = QLabel(t("dialog.filter.subtitle", default="Available Filters:"), self)
         list_label.setStyleSheet("font-weight: 600; font-size: 12px;")
         left_layout.addWidget(list_label)
 
         self.filter_list = QListWidget(self)
         for f_id in SUPPORTED_FILTERS:
-            item = QListWidgetItem(f_id.replace("_", " ").title())
+            filter_name = t(f"filter.{f_id}", default=f_id.replace("_", " ").title())
+            item = QListWidgetItem(filter_name)
             item.setData(Qt.UserRole, f_id)
             self.filter_list.addItem(item)
 
@@ -89,7 +91,7 @@ class FilterDialog(QDialog):
         right_layout.addWidget(preview_frame, stretch=1)
 
         # Compare Button
-        self.compare_btn = QPushButton("Hold to View Original", self)
+        self.compare_btn = QPushButton(t("panel.adjustments.compare", default="Hold to View Original"), self)
         self.compare_btn.pressed.connect(self._show_original)
         self.compare_btn.released.connect(self._show_filtered)
         right_layout.addWidget(self.compare_btn)
@@ -98,11 +100,11 @@ class FilterDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(10)
 
-        cancel_btn = QPushButton("Cancel", self)
+        cancel_btn = QPushButton(t("dialog.common.cancel", default="Cancel"), self)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
-        apply_btn = QPushButton("Apply Filter", self)
+        apply_btn = QPushButton(t("dialog.common.apply", default="Apply Filter"), self)
         apply_btn.setObjectName("PrimaryAction")
         apply_btn.clicked.connect(self.accept)
         btn_layout.addWidget(apply_btn)

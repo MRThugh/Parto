@@ -335,9 +335,24 @@ class BrushStudioDock(QDockWidget):
         self._sync_from_settings()
 
     def retranslate_ui(self) -> None:
-        """Update brush studio dock title with active language."""
+        """Update brush studio dock title, child sections, and controls with active language."""
         from parto.localization import t
         self.setWindowTitle(t("brush.studio", default="Brush Studio"))
+
+        for section in (
+            getattr(self, "presets_section", None),
+            getattr(self, "properties_section", None),
+            getattr(self, "color_section", None),
+            getattr(self, "blend_section", None),
+            getattr(self, "dynamics_section", None),
+            getattr(self, "advanced_section", None),
+        ):
+            if section is not None and hasattr(section, "retranslate_ui"):
+                section.retranslate_ui()
+
+        if hasattr(self, "btn_reset_defaults"):
+            self.btn_reset_defaults.setText(t("brush.reset_defaults", default="Reset Brush to Factory Defaults"))
+            self.btn_reset_defaults.setToolTip(t("brush.reset_defaults_desc", default="Reset all brush parameters to default state (Shift+F9)"))
 
 
 # Compatibility Aliases

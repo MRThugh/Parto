@@ -10,6 +10,13 @@ from .models import (
     DiagnosticRecord,
     CATALOG_SCHEMA_VERSION,
     SUPPORTED_SCHEMA_VERSIONS,
+    LocalizationError,
+    CatalogError,
+    CatalogNotFoundError,
+    CatalogValidationError,
+    InvalidLocaleIdentifierError,
+    LocaleSwitchError,
+    is_valid_locale_id,
 )
 from .catalog import TranslationCatalog
 from .loader import LanguageCatalogLoader
@@ -18,6 +25,7 @@ from .formatting import (
     get_plural_category,
     resolve_translation_entry,
     extract_placeholders,
+    validate_placeholder_syntax,
 )
 from .persistence import LocalePreferences
 from .manager import (
@@ -32,12 +40,20 @@ __all__ = [
     "DiagnosticRecord",
     "CATALOG_SCHEMA_VERSION",
     "SUPPORTED_SCHEMA_VERSIONS",
+    "LocalizationError",
+    "CatalogError",
+    "CatalogNotFoundError",
+    "CatalogValidationError",
+    "InvalidLocaleIdentifierError",
+    "LocaleSwitchError",
+    "is_valid_locale_id",
     "TranslationCatalog",
     "LanguageCatalogLoader",
     "safe_interpolate",
     "get_plural_category",
     "resolve_translation_entry",
     "extract_placeholders",
+    "validate_placeholder_syntax",
     "LocalePreferences",
     "LocalizationManager",
     "get_localization_manager",

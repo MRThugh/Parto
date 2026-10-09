@@ -19,6 +19,39 @@ def extract_placeholders(template: str) -> Set[str]:
     return set(PLACEHOLDER_REGEX.findall(template))
 
 
+def validate_placeholder_syntax(template: str) -> Tuple[bool, Optional[str]]:
+    """
+    Validate that curly brackets in a template string form valid named placeholders.
+    Returns (is_valid, error_message).
+    Detects unclosed '{', unopened '}', empty '{}', or invalid identifier characters.
+    """
+    if not isinstance(template, str):
+        return False, f"Template must be a string, got {type(template).__name__}"
+
+    in_brace = False
+    start_pos = -1
+    for i, ch in enumerate(template):
+        if ch == "{":
+            if in_brace:
+                return False, f"Nested or unclosed placeholder bracket at position {i}"
+            in_brace = True
+            start_pos = i
+        elif ch == "}":
+            if not in_brace:
+                return False, f"Unmatched closing bracket at position {i}"
+            content = template[start_pos + 1 : i]
+            if not content:
+                return False, f"Empty placeholder '{{}}' at position {start_pos}"
+            if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", content):
+                return False, f"Invalid placeholder identifier '{{{content}}}' at position {start_pos}"
+            in_brace = False
+
+    if in_brace:
+        return False, f"Unclosed placeholder bracket at position {start_pos}"
+
+    return True, None
+
+
 def safe_interpolate(
     template: str,
     params: Dict[str, Any],

@@ -121,3 +121,12 @@ class BrushAdvancedSection(QWidget):
             return
         if hasattr(self.settings, "set_angle_jitter"):
             self.settings.set_angle_jitter(val / 100.0)
+
+    def retranslate_ui(self) -> None:
+        """Update advanced section header and row labels with active language."""
+        from parto.localization import t
+        self.section.set_title(t("brush.studio.advanced_title", default="Advanced & Stroke"))
+        self.row_smoothing.label.setText(t("brush.studio.smoothing", default="Smoothing:"))
+        self.row_scatter.label.setText(t("brush.studio.scatter", default="Scatter:"))
+        self.row_size_jitter.label.setText(t("brush.studio.size_jitter", default="Size Jitter:"))
+        self.row_angle_jitter.label.setText(t("brush.studio.angle_jitter", default="Angle Jitter:"))

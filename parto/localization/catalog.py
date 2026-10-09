@@ -80,21 +80,33 @@ class TranslationCatalog:
             "translations": self._translations,
         }
 
+    def get_placeholders(self, key: str) -> Set[str]:
+        """Return all named placeholders for a given translation key."""
+        entry = self.get(key)
+        if not entry:
+            return set()
+        from .formatting import extract_placeholders
+        if isinstance(entry, str):
+            return extract_placeholders(entry)
+        if isinstance(entry, dict):
+            res: Set[str] = set()
+            for v in entry.values():
+                if isinstance(v, str):
+                    res.update(extract_placeholders(v))
+            return res
+        return set()
+
+    def is_complete_against(self, reference: TranslationCatalog) -> Tuple[bool, Set[str]]:
+        """Check if catalog contains all keys from reference catalog. Returns (is_complete, missing_keys)."""
+        ref_keys = reference.keys()
+        cur_keys = self.keys()
+        missing = ref_keys - cur_keys
+        return len(missing) == 0, missing
+
     def validate(self) -> List[str]:
         """Validate catalog entries for structural and type correctness."""
-        errors: List[str] = []
-        if not self.metadata.id:
-            errors.append("Catalog metadata missing 'id'.")
-        if not self._translations:
-            errors.append(f"Catalog '{self.id}' contains no translation entries.")
-
-        for k, v in self._translations.items():
-            if not isinstance(k, str) or not k.strip():
-                errors.append(f"Invalid key format: {k!r}")
-            if not isinstance(v, (str, dict)):
-                errors.append(f"Key '{k}' must map to a string or plural dictionary, got {type(v).__name__}")
-            elif isinstance(v, dict):
-                for p_cat, p_val in v.items():
-                    if not isinstance(p_val, str):
-                        errors.append(f"Plural key '{k}[{p_cat}]' must map to string, got {type(p_val).__name__}")
-        return errors
+        from .loader import LanguageCatalogLoader
+        is_valid, err = LanguageCatalogLoader.validate_catalog_dict(self.to_dict())
+        if not is_valid and err:
+            return [err]
+        return []

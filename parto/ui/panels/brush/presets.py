@@ -265,3 +265,9 @@ class BrushPresetsSection(QWidget):
                 self.preset_changed.emit(imported.name)
             else:
                 QMessageBox.warning(self, "Import Failed", f"Could not read brush preset from {os.path.basename(path)}")
+
+    def retranslate_ui(self) -> None:
+        """Update presets section header and search placeholder with active language."""
+        from parto.localization import t
+        self.section.set_title(t("brush.studio.presets_title", default="Brush Presets"))
+        self.search_edit.setPlaceholderText(t("brush.studio.search_placeholder", default="🔍 Search presets... (Ctrl+Shift+B)"))

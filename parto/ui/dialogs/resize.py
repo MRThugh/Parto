@@ -48,7 +48,7 @@ class ResizeDialog(QDialog):
         layout.setSpacing(16)
 
         # Dimension Inputs Group
-        dim_group = QGroupBox("Dimensions (Pixels)", self)
+        dim_group = QGroupBox(t("dialog.resize.dimensions_group", default="Dimensions (Pixels)"), self)
         dim_layout = QVBoxLayout(dim_group)
         dim_layout.setSpacing(12)
 
@@ -81,7 +81,7 @@ class ResizeDialog(QDialog):
         layout.addWidget(dim_group)
 
         # Presets
-        preset_group = QGroupBox("Quick Presets", self)
+        preset_group = QGroupBox(t("dialog.resize.quick_presets", default="Quick Presets"), self)
         preset_layout = QHBoxLayout(preset_group)
         preset_layout.setSpacing(6)
 
@@ -94,7 +94,7 @@ class ResizeDialog(QDialog):
 
         # Resampling Filter
         resample_layout = QHBoxLayout()
-        resample_layout.addWidget(QLabel("Resampling Quality:", self))
+        resample_layout.addWidget(QLabel(t("dialog.resize.resample", default="Resampling Quality:"), self))
         self.resample_combo = QComboBox(self)
         self.resample_combo.addItems([
             "Lanczos (Best Quality)",

@@ -55,15 +55,22 @@ class ImageInfoDialog(QDialog):
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
 
+        has_alpha = self.metadata.get("has_alpha")
+        transparency_str = (
+            t("dialog.info.alpha_yes", default="Yes (Alpha Channel)")
+            if has_alpha
+            else t("dialog.info.alpha_no", default="None (Opaque)")
+        )
+
         rows = [
-            ("Dimensions", self.metadata.get("dimensions", "N/A")),
-            ("Aspect Ratio", self.metadata.get("aspect_ratio", "N/A")),
-            ("Megapixels", self.metadata.get("megapixels", "N/A")),
-            ("Color Mode", self.metadata.get("color_mode", "N/A")),
-            ("Transparency", "Yes (Alpha Channel)" if self.metadata.get("has_alpha") else "None (Opaque)"),
-            ("File Format", str(self.metadata.get("file_format", "N/A"))),
-            ("File Size", str(self.metadata.get("file_size", "N/A"))),
-            ("File Path", str(self.metadata.get("file_path", "N/A"))),
+            (t("dialog.info.dimensions", default="Dimensions"), self.metadata.get("dimensions", "N/A")),
+            (t("dialog.info.aspect_ratio", default="Aspect Ratio"), self.metadata.get("aspect_ratio", "N/A")),
+            (t("dialog.info.megapixels", default="Megapixels"), self.metadata.get("megapixels", "N/A")),
+            (t("dialog.info.color_mode", default="Color Mode"), self.metadata.get("color_mode", "N/A")),
+            (t("dialog.info.transparency", default="Transparency"), transparency_str),
+            (t("dialog.info.file_format", default="File Format"), str(self.metadata.get("file_format", "N/A"))),
+            (t("dialog.info.file_size", default="File Size"), str(self.metadata.get("file_size", "N/A"))),
+            (t("dialog.info.file_path", default="File Path"), str(self.metadata.get("file_path", "N/A"))),
         ]
 
         self.table.setRowCount(len(rows))
@@ -79,13 +86,13 @@ class ImageInfoDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(10)
 
-        copy_path_btn = QPushButton("Copy File Path", self)
+        copy_path_btn = QPushButton(t("dialog.info.copy_path", default="Copy File Path"), self)
         copy_path_btn.clicked.connect(self._copy_path)
         btn_layout.addWidget(copy_path_btn)
 
         btn_layout.addStretch()
 
-        close_btn = QPushButton("Close", self)
+        close_btn = QPushButton(t("dialog.common.close", default="Close"), self)
         close_btn.setObjectName("PrimaryAction")
         close_btn.clicked.connect(self.accept)
         btn_layout.addWidget(close_btn)

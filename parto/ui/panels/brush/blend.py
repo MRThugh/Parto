@@ -138,3 +138,11 @@ class BrushBlendSection(QWidget):
         if self._updating:
             return
         self.settings.set_is_eraser(checked)
+
+    def retranslate_ui(self) -> None:
+        """Update blend section header and labels with active language."""
+        from parto.localization import t
+        self.section.set_title(t("brush.studio.blend_title", default="Blend & Rendering"))
+        self.row_opacity.label.setText(t("brush.bar.opacity", default="Opacity:"))
+        self.row_flow.label.setText(t("brush.studio.flow", default="Flow:"))
+        self.cb_eraser.setText(t("brush.studio.erase_mode", default="Erase Mode (Alpha Eraser)"))

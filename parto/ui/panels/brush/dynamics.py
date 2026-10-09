@@ -130,3 +130,8 @@ class BrushDynamicsSection(QWidget):
             return
         if hasattr(self.settings, "set_dynamics_angle"):
             self.settings.set_dynamics_angle(text.lower())
+
+    def retranslate_ui(self) -> None:
+        """Update dynamics section header with active language."""
+        from parto.localization import t
+        self.section.set_title(t("brush.studio.dynamics_title", default="Dynamics"))

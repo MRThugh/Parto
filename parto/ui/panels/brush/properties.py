@@ -143,3 +143,13 @@ class BrushTipPropertiesSection(QWidget):
             return
         if hasattr(self.settings, "set_roundness"):
             self.settings.set_roundness(val / 100.0)
+
+    def retranslate_ui(self) -> None:
+        """Update section title and row labels with active language."""
+        from parto.localization import t
+        self.section.set_title(t("brush.studio.tip_title", default="Brush Tip"))
+        self.row_size.label.setText(t("brush.bar.size", default="Size:"))
+        self.row_hardness.label.setText(t("brush.bar.hardness", default="Hardness:"))
+        self.row_spacing.label.setText(t("brush.studio.spacing", default="Spacing:"))
+        self.row_angle.label.setText(t("brush.studio.angle", default="Angle:"))
+        self.row_roundness.label.setText(t("brush.studio.roundness", default="Roundness:"))
