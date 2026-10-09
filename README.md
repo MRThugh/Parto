@@ -1,12 +1,16 @@
 # Parto (پرتو) — Lightweight Desktop Image Editor
 
 [![Version](https://img.shields.io/badge/version-0.3.1-blue.svg)](https://github.com/MRThugh/Parto)
+[![Release Line](https://img.shields.io/badge/release%20line-v0.4.0-orange.svg)](https://github.com/MRThugh/Parto)
 [![Python](https://img.shields.io/badge/python-3.10+-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![PySide6](https://img.shields.io/badge/GUI-PySide6%20%2F%20Qt-41CD52.svg?logo=qt&logoColor=white)](https://pypi.org/project/PySide6/)
 [![Pillow](https://img.shields.io/badge/imaging-Pillow-blue.svg)](https://python-pillow.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > **Parto** (*پرتو* — Ray / Beam of Light) is a fast, modern, and lightweight desktop image editor designed for daily image tasks without the bloat, slow startup, or visual clutter of heavyweight software.
+>
+> **Release Line:** v0.4.0 (Active Development — Localization Core & Architecture 2.0)  
+> **Current Package Version:** v0.3.1 (Latest tagged package)
 
 ---
 
@@ -51,18 +55,19 @@
 - **Dynamic Theming & 200ms Crossfade Transitions**:
   - 5 curated palettes: **Dark**, **Light**, **Graphite**, **Midnight**, and **Nord**.
   - Smooth 200ms crossfade animation (`transition_theme`) using `QGraphicsOpacityEffect` and `QPropertyAnimation`.
-- **Localization Core Subsystem (`parto/localization/`, `docs/LOCALIZATION.md`)**:
+- **Localization Core Subsystem (`parto/localization/`, [`docs/LOCALIZATION.md`](docs/LOCALIZATION.md))**:
   - Independent, UI-decoupled internationalization service managing runtime locale switching, catalog discovery, translation fallback chains, and layout direction synchronization.
-  - Bundled factory catalogs for **English** (LTR) and **Persian / فارسی** (RTL), each with 191 verified translation keys and zero placeholder discrepancies.
+  - Bundled factory catalogs for **English** (LTR) and **Persian / فارسی** (RTL), each with 191 verified translation keys and 100% key parity.
   - Dynamic layout direction synchronization updating `QApplication.setLayoutDirection` and top-level windows (`Qt.LeftToRight` $\leftrightarrow$ `Qt.RightToLeft`).
   - Atomic runtime switching: validates candidate catalogs prior to commit, preserving previous valid locale and text direction if candidate validation fails.
-  - State preservation: language changes update UI texts without disturbing document identity, unsaved modifications, layer stacks, undo/redo history, brush settings, zoom factors, or active themes.
-  - Subscriber and UI refresh isolation: exceptions in individual widget retranslation callbacks are isolated and recorded in diagnostics without aborting other subscribers.
-  - Future Intent Subsystem integration contract via `format_intent_response()` allowing headless background tasks and future automation agents to obtain localized messages in arbitrary target languages.
+  - Explicit persistence failure contract: default resilient mode (`strict_persistence=False`) keeps the active session in the new locale while displaying a notification toast; strict mode (`strict_persistence=True`) atomically rolls back locale and layout direction.
+  - Subscriber and UI refresh isolation: exceptions in individual widget retranslation callbacks are isolated and recorded in diagnostics (`last_listener_failures`, `last_refresh_completed`) without aborting other subscribers.
+  - Future Intent Subsystem integration contract via `format_intent_response()` for localized messages in background and automation tasks.
+  - *Verification Status:* Core localization logic verified with 26 unit tests passing. Qt-dependent integration test (`test_locale_state_preservation.py`) verification is pending in environments without PySide6. See [`docs/LOCALIZATION.md`](docs/LOCALIZATION.md) for full documentation.
 - **High-DPI Vector Icon System**:
   - Resolution-independent icons rendered via `QPainter` paths with canonical alias normalization.
-- **Robust 357-Test Automated Verification**:
-  - 357 automated tests validating document state isolation, transform engines, compositing, storage adapters, brush studio properties, presets, dab generation, layers, command history, shortcuts, localization catalogs, failure rollback, state preservation, and theme palettes.
+- **Automated QA & Test Suite (357 Test Cases)**:
+  - 357 test cases defined across 44 test files validating document state isolation, transform engines, compositing, storage adapters, brush studio properties, presets, dab generation, layers, command history, shortcuts, localization catalogs, failure rollback, state preservation, and theme palettes. (Full suite passes in headless Qt environments; pure Python/headless unit tests run without Qt).
 
 ---
 
@@ -171,7 +176,7 @@ Parto/
 │   │   │   └── brush/         # BrushStudioDock: Header, Presets, Properties, Dynamics, Color, Blend, Advanced
 │   │   └── dialogs/           # Shortcuts, About, Resize, Image Info, Filter Gallery, Command Palette
 │   └── utils/                 # Path helpers, settings persistence & error formatting
-├── tests/                     # Automated unit, integration, regression, and UI test suites (297 tests)
+├── tests/                     # Automated unit, integration, regression, and UI test suites (357 test cases)
 ├── requirements.txt           # Python package dependencies
 ├── logo.png                   # Parto application branding icon
 ├── LICENSE                    # MIT License
@@ -286,22 +291,29 @@ Parto features a normalized, zero-conflict shortcut system registered through `S
 
 ---
 
-## Testing
+## Testing & QA Status
 
-Parto includes a comprehensive automated test suite with **357 tests** covering all image processing routines, document state isolation, transform engines, compositing, storage adapters, brush studio properties, dab generation, presets, layers, command history, dialogs, format conversions, localization catalogs, failure rollback, state preservation, and theme transitions.
+Parto maintains an automated test suite containing **357 test cases** across 44 test files covering image processing routines, document state isolation, transform engines, compositing, storage adapters, brush studio properties, dab generation, presets, layers, command history, dialogs, format conversions, localization catalogs, failure rollback, state preservation, and theme transitions.
 
-Run the test suite using pytest:
+### Test Execution Status:
+- **Localization Core Unit Suite (`tests/unit/test_localization_core.py`)**: 26 unit tests verifying catalog loading, validation, pluralization, safe interpolation, fallback resolution, subscriber isolation, and rollback semantics. Runs in pure Python environments without Qt.
+- **Editor State Preservation Integration Suite (`tests/integration/test_locale_state_preservation.py`)**: 2 end-to-end integration tests verifying preservation of document identity, dirty modification flag, layer stacks, undo/redo history, brush settings, active tools, zoom factors, and themes across language switches. *Requires PySide6 and Pillow; verification is pending in environments lacking GUI dependencies.*
+- **Full Regression Suite**: 357 test cases verified passing in full CI environments (Ubuntu 22.04 with PySide6, Pillow, NumPy, and offscreen Qt).
+
+### Running Tests:
 
 ```bash
-# Run full regression suite (357 tests)
-QT_QPA_PLATFORM=offscreen pytest
+# Run localization core unit tests (pure Python / headless fallback, 26 tests)
+python3 -m pytest tests/unit/test_localization_core.py -v
 
-# Run localization core unit tests (26 tests)
-QT_QPA_PLATFORM=offscreen pytest tests/unit/test_localization_core.py -v
+# Run editor state preservation integration tests (requires PySide6 and Pillow)
+QT_QPA_PLATFORM=offscreen python3 -m pytest tests/integration/test_locale_state_preservation.py -v
 
-# Run editor state preservation integration tests (2 tests)
-QT_QPA_PLATFORM=offscreen pytest tests/integration/test_locale_state_preservation.py -v
+# Run full test suite (requires PySide6, Pillow, NumPy, and pytest)
+QT_QPA_PLATFORM=offscreen python3 -m pytest
 ```
+
+See [`tests/README.md`](tests/README.md) for complete details on test layout, environment requirements, and execution guidelines.
 
 ---
 

@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added comprehensive integration tests (`test_architecture_20_closure.py`) validating layer opacity coalescing without snapshot creation, isolated layer brush strokes without document snapshot duplication, transform commands, shortcut/action execution consistency, dirty state tracking, and command palette integration.
 
 ### Changed
+- **Documentation Audit & Release-Readiness Consistency**:
+  - Aligned project documentation (`README.md`, `ARCHITECTURE.md`, `tests/README.md`, `docs/LOCALIZATION.md`, and `parto/brush/README.md`) to clearly distinguish the active `v0.4.0` development release line from the currently declared `0.3.1` package version.
+  - Reconciled release status statements: replaced unsupported "Production Ready" and global "FINALIZED" labels with evidence-based status (26 Localization Core unit tests passing; Qt-dependent integration test verification pending in environments lacking PySide6).
+  - Clarified test categorization across existing test files (44 files / 357 cases), passing CI tests, pure-Python unit tests, and tests blocked in minimal environments without PySide6.
+  - Updated Brush documentation in `parto/brush/README.md` to reflect Architecture 2.0 `PaintStrokeCommand` memory isolation.
 - **Layers Panel Opacity Workflow**:
   - Replaced legacy `create_snapshot()` and `record_operation()` calls with authoritative `ChangeLayerOpacityCommand` routed through `HistoryManager.execute()`.
   - Implemented slider drag session tracking to coalesce fine-grained opacity adjustments into a single undo/redo history step while maintaining non-drag atomicity.

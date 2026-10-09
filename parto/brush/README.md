@@ -1,6 +1,6 @@
 # Parto Brush System Architecture
 
-The Brush subsystem in `parto/brush` is a dedicated, self-contained domain responsible for brush configuration, preset management, input normalization, stroke lifecycles, and raster operations in **Parto v0.3.x**.
+The Brush subsystem in `parto/brush` is a dedicated, self-contained domain responsible for brush configuration, preset management, input normalization, stroke lifecycles, and raster operations across Parto releases (v0.3.x through current v0.4.0 release line).
 
 ---
 
@@ -115,7 +115,7 @@ The Brush subsystem in `parto/brush` is a dedicated, self-contained domain respo
 3. **`end_stroke(doc)`**:
    - Active layer bytes are compared byte-for-byte with the pre-stroke buffer.
    - **No-op check**: If no bytes changed, the snapshot is discarded and no history command is recorded.
-   - **Commit**: If pixels changed, `SnapshotCommand` is committed to `doc.history`, document is flagged modified, and composite pixmap is refreshed.
+   - **Commit**: If pixels changed, `PaintStrokeCommand` is committed to `doc.history` (encapsulating only the affected layer's before/after raster images without whole-document cloning; `SnapshotCommand` is retained as a legacy fallback), document is flagged modified, and composite pixmap is refreshed.
 4. **`cancel_stroke(doc)`**:
    - Restores the exact pre-stroke image to the active layer and rolls back document state.
 

@@ -2,12 +2,14 @@
 
 **Author & Project Owner:** Ali Kamrani (MRThugh)  
 **System:** Parto (پرتو) — Lightweight Desktop Image Editor  
-**Version:** Parto v0.3.1  
-**Status:** FINALIZED  
+**Declared Package Version:** 0.3.1  
+**Active Release Line:** v0.4.0 (In Development)  
+**Status:** Architecture 2.0 Finalized in v0.3.1; Localization Core Implemented for v0.4.0 (Unit-Verified, Integration Verification Pending)  
 
 ```text
-PARTO ACTION + COMMAND + HISTORY ARCHITECTURE 2.0
-Status: FINALIZED
+PARTO ARCHITECTURE SPECIFICATION
+Action + Command + History Architecture 2.0: FINALIZED (v0.3.1)
+Localization Core Architecture: IMPLEMENTED / INTEGRATION PENDING (v0.4.0)
 ```
 
 ---
@@ -309,8 +311,21 @@ Parto v0.4.0 establishes a robust, decoupled, and failure-tolerant international
 6. **Layout Direction Synchronization**:
    - Automatically synchronizes application layout direction (`QApplication.setLayoutDirection`) and window layout directions between `Qt.LeftToRight` (English) and `Qt.RightToLeft` (Persian).
 7. **Subscriber Isolation & Error Recovery**:
-   - Observers are invoked inside isolated `try...except` blocks. An exception in one widget retranslation callback is recorded in `last_listener_failures` and does not prevent other widgets from updating.
-   - Persistence failures in default mode (`strict_persistence=False`) are non-fatal side effects; the active session remains in the requested language and UI toast alerts the user that settings were not saved.
-8. **Future Intent Subsystem Integration Contract**:
-   - Exposes `format_intent_response(key, locale=None, **kwargs)` for headless CLI, scripts, and future intent automation without UI dependencies.
+   - Observers and Qt signals are invoked inside isolated `try...except` blocks.
+   - An exception in one observer or UI callback is recorded in `last_listener_failures` and sets `last_refresh_completed = False`, without halting other subscribers.
+   - If the core locale-state transition succeeds, `set_locale()` returns `True`, allowing callers to inspect `last_refresh_completed` and `last_listener_failures` for partial UI refresh issues.
+8. **Settings Persistence Contract & Strict Rollback**:
+   - **Default Mode (`strict_persistence=False`)**: Persistence is treated as a non-fatal post-commit side effect. If disk writing fails, `last_persistence_succeeded` is set to `False`, `last_persistence_error` records the exception, and the active session remains in the newly selected language. `MainWindow` notifies the user via toast notification (`toast.language_switched_not_saved`).
+   - **Strict Mode (`strict_persistence=True`)**: If disk writing fails, an atomic rollback is triggered: the active locale reverts to the previous working locale, `QApplication.setLayoutDirection` is restored to the previous direction, `last_persistence_succeeded = False` is set, and `set_locale()` returns `False`.
+9. **UI Refresh Pipeline (`MainWindow._on_locale_changed`)**:
+   - Handles `locale_changed` signal by updating window layout direction and title.
+   - Retranslates attached modular components (`toolbar`, `statusbar`, `welcome_screen`, `crop_bar`, `brush_bar`, `layers_dock`, `adjustments_dock`, `brush_dock`) and menus (`EditorMenuBar.retranslate_menus`) in isolated blocks.
+   - Dispatches user feedback toast (`toast.language_switched` or `toast.language_switched_not_saved`).
+   - *Limitation:* In-flight open dialogs (e.g. `ResizeDialog`, `AboutDialog`) are not dynamically retranslated in-place; their localized labels are bound upon instantiation.
+10. **State Preservation Guarantee & Verification Status**:
+    - The localization subsystem strictly isolates document state, canvas geometry, layer stacks, undo/redo history, brush tool parameters, zoom factor, and active theme from language switching.
+    - *Verification Evidence:* 26 core unit tests in `tests/unit/test_localization_core.py` pass; end-to-end integration test (`tests/integration/test_locale_state_preservation.py`) verification is pending execution in environments equipped with PySide6.
+11. **Future Intent Subsystem Integration Contract**:
+    - Exposes `format_intent_response(key, locale=None, **kwargs)` for headless CLI, background tasks, and future automation workflows.
+    - Note: This is an architectural formatting contract rather than an autonomous NLP/agent implementation.
 
