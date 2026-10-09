@@ -1,6 +1,6 @@
 # parto/ui/widgets/welcome.py
 """
-Parto v0.3.0 - Modern Welcome Screen with Drag-and-Drop
+Parto v0.4.0 - Modern Welcome Screen with Drag-and-Drop and Localization
 Author: Ali Kamrani (MRThugh)
 """
 
@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 from parto.resources.icons import get_parto_icon
 from parto.themes.manager import get_theme_manager
+from parto.localization import t
 
 
 class WelcomeScreen(QWidget):
@@ -58,36 +59,36 @@ class WelcomeScreen(QWidget):
         card_layout.addWidget(logo_label)
 
         # App Title & Subtitle
-        title_label = QLabel("Parto (پرتو)", self)
-        title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("font-size: 24px; font-weight: 700; margin-top: 4px;")
-        card_layout.addWidget(title_label)
+        self.title_label = QLabel(t("welcome.title"), self)
+        self.title_label.setAlignment(Qt.AlignCenter)
+        self.title_label.setStyleSheet("font-size: 24px; font-weight: 700; margin-top: 4px;")
+        card_layout.addWidget(self.title_label)
 
-        subtitle_label = QLabel("Fast, modern, and lightweight desktop image editor", self)
-        subtitle_label.setAlignment(Qt.AlignCenter)
-        subtitle_label.setStyleSheet("font-size: 13px; color: #a1a1aa; margin-bottom: 8px;")
-        card_layout.addWidget(subtitle_label)
+        self.subtitle_label = QLabel(t("welcome.subtitle"), self)
+        self.subtitle_label.setAlignment(Qt.AlignCenter)
+        self.subtitle_label.setStyleSheet("font-size: 13px; color: #a1a1aa; margin-bottom: 8px;")
+        card_layout.addWidget(self.subtitle_label)
 
         # Drag-and-drop prompt
-        drop_prompt = QLabel("Drop an image file here to start editing", self)
-        drop_prompt.setAlignment(Qt.AlignCenter)
-        drop_prompt.setStyleSheet("font-size: 13px; font-weight: 500;")
-        card_layout.addWidget(drop_prompt)
+        self.drop_prompt = QLabel(t("welcome.drop_prompt"), self)
+        self.drop_prompt.setAlignment(Qt.AlignCenter)
+        self.drop_prompt.setStyleSheet("font-size: 13px; font-weight: 500;")
+        card_layout.addWidget(self.drop_prompt)
 
         # Action Buttons
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(12)
         btn_layout.setAlignment(Qt.AlignCenter)
 
-        open_btn = QPushButton("Open Image...", self)
-        open_btn.setObjectName("PrimaryAction")
-        open_btn.setIcon(get_parto_icon("open", "#ffffff", 18))
-        open_btn.clicked.connect(self.open_requested.emit)
-        btn_layout.addWidget(open_btn)
+        self.open_btn = QPushButton(t("welcome.open_button"), self)
+        self.open_btn.setObjectName("PrimaryAction")
+        self.open_btn.setIcon(get_parto_icon("open", "#ffffff", 18))
+        self.open_btn.clicked.connect(self.open_requested.emit)
+        btn_layout.addWidget(self.open_btn)
 
-        new_btn = QPushButton("New Canvas...", self)
-        new_btn.clicked.connect(self.new_requested.emit)
-        btn_layout.addWidget(new_btn)
+        self.new_btn = QPushButton(t("welcome.new_button"), self)
+        self.new_btn.clicked.connect(self.new_requested.emit)
+        btn_layout.addWidget(self.new_btn)
 
         card_layout.addLayout(btn_layout)
 
@@ -108,6 +109,14 @@ class WelcomeScreen(QWidget):
         card_layout.addLayout(formats_layout)
 
         main_layout.addWidget(card)
+
+    def retranslate_ui(self) -> None:
+        """Update texts when application language changes."""
+        self.title_label.setText(t("welcome.title"))
+        self.subtitle_label.setText(t("welcome.subtitle"))
+        self.drop_prompt.setText(t("welcome.drop_prompt"))
+        self.open_btn.setText(t("welcome.open_button"))
+        self.new_btn.setText(t("welcome.new_button"))
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         if event.mimeData().hasUrls():

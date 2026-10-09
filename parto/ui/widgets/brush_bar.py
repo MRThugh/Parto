@@ -214,10 +214,10 @@ class BrushBar(QWidget):
         self.preview.clicked.connect(self._open_color_dialog)
         main_layout.addWidget(self.preview)
 
-        title_label = QLabel("Brush", self)
-        title_label.setObjectName("BrushBarTitle")
-        title_label.setStyleSheet("font-weight: 700; font-size: 11px; letter-spacing: 0.5px;")
-        main_layout.addWidget(title_label)
+        self.title_label = QLabel("Brush", self)
+        self.title_label.setObjectName("BrushBarTitle")
+        self.title_label.setStyleSheet("font-weight: 700; font-size: 11px; letter-spacing: 0.5px;")
+        main_layout.addWidget(self.title_label)
 
         main_layout.addWidget(self._create_separator())
 
@@ -298,9 +298,9 @@ class BrushBar(QWidget):
         size_layout.setSpacing(6)
         size_layout.setContentsMargins(0, 0, 0, 0)
 
-        lbl = QLabel("Size:", self)
-        lbl.setStyleSheet("font-size: 11px; font-weight: 500;")
-        size_layout.addWidget(lbl)
+        self.lbl_size = QLabel("Size:", self)
+        self.lbl_size.setStyleSheet("font-size: 11px; font-weight: 500;")
+        size_layout.addWidget(self.lbl_size)
 
         # Consistent range 1 to 500
         self.slider_size = QSlider(Qt.Horizontal, self)
@@ -331,9 +331,9 @@ class BrushBar(QWidget):
         dynamics_layout.setContentsMargins(0, 0, 0, 0)
 
         # Opacity
-        lbl_op = QLabel("Opacity:", self)
-        lbl_op.setStyleSheet("font-size: 11px; font-weight: 500;")
-        dynamics_layout.addWidget(lbl_op)
+        self.lbl_op = QLabel("Opacity:", self)
+        self.lbl_op.setStyleSheet("font-size: 11px; font-weight: 500;")
+        dynamics_layout.addWidget(self.lbl_op)
 
         self.slider_opacity = QSlider(Qt.Horizontal, self)
         self.slider_opacity.setRange(1, 100)
@@ -355,9 +355,9 @@ class BrushBar(QWidget):
         self.spin_opacity.valueChanged.connect(self._on_opacity_spin_changed)
 
         # Hardness
-        lbl_hard = QLabel("Hardness:", self)
-        lbl_hard.setStyleSheet("font-size: 11px; font-weight: 500;")
-        dynamics_layout.addWidget(lbl_hard)
+        self.lbl_hard = QLabel("Hardness:", self)
+        self.lbl_hard.setStyleSheet("font-size: 11px; font-weight: 500;")
+        dynamics_layout.addWidget(self.lbl_hard)
 
         self.slider_hardness = QSlider(Qt.Horizontal, self)
         self.slider_hardness.setRange(0, 100)
@@ -611,3 +611,19 @@ class BrushBar(QWidget):
 
     def _on_theme_changed(self, _: str) -> None:
         self._apply_theme_styling()
+
+    def retranslate_ui(self) -> None:
+        """Update brush bar labels and tooltips with current locale."""
+        from ...localization import t
+        if hasattr(self, "title_label"):
+            self.title_label.setText(t("tool.brush", default="Brush"))
+        if hasattr(self, "lbl_size"):
+            self.lbl_size.setText(t("brush.bar.size", default="Size:"))
+        if hasattr(self, "lbl_op"):
+            self.lbl_op.setText(t("brush.bar.opacity", default="Opacity:"))
+        if hasattr(self, "lbl_hard"):
+            self.lbl_hard.setText(t("brush.bar.hardness", default="Hardness:"))
+        if hasattr(self, "swap_btn"):
+            self.swap_btn.setToolTip(t("brush.bar.swap_colors", default="Swap Foreground / Background Colors (X)"))
+        if hasattr(self, "reset_btn"):
+            self.reset_btn.setToolTip(t("brush.bar.reset_colors", default="Reset to Default Black / White (D)"))

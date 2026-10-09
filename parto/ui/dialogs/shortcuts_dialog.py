@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
 )
 from parto.shortcuts.manager import get_shortcut_manager, ShortcutDefinition
+from parto.localization import t
 
 
 class KeySequenceInputDialog(QDialog):
@@ -66,7 +67,7 @@ class ShortcutsDialog(QDialog):
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.setWindowTitle("Keyboard Shortcuts — Parto")
+        self.setWindowTitle(t("dialog.shortcuts.title", default="Keyboard Shortcuts — Parto"))
         self.setModal(True)
         self.setMinimumSize(660, 480)
         self.resize(720, 520)
@@ -162,6 +163,16 @@ class ShortcutsDialog(QDialog):
 
         sm = get_shortcut_manager()
         all_shortcuts = sm.get_all()
+        if not all_shortcuts:
+            try:
+                from parto.actions.builtins import get_all_builtin_actions
+                for act in get_all_builtin_actions():
+                    sc = act.shortcut or act.default_shortcut
+                    if sc:
+                        sm.register(act.id, act.name, act.category, sc, act.description)
+                all_shortcuts = sm.get_all()
+            except Exception:
+                pass
 
         matching = []
         for defn in all_shortcuts:

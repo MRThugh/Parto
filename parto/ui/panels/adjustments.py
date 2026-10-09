@@ -1,7 +1,8 @@
 # parto/ui/panels/adjustments.py
 """
-Parto v0.3.0 - Live Color Adjustments Dock Panel
+Parto v0.4.0 - Live Color Adjustments Dock Panel
 Author: Ali Kamrani (MRThugh)
+Integrated with Localization Subsystem.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QGroupBox,
 )
+from parto.localization import t
 
 
 class AdjustmentDock(QDockWidget):
@@ -28,7 +30,7 @@ class AdjustmentDock(QDockWidget):
     reset_preview_requested = Signal()
 
     def __init__(self, parent: Optional[QWidget] = None):
-        super().__init__("Adjustments", parent)
+        super().__init__(t("panel.adjustments.title", default="Adjustments"), parent)
         self.setObjectName("AdjustmentDock")
         self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
 
@@ -41,23 +43,31 @@ class AdjustmentDock(QDockWidget):
         layout.setSpacing(14)
 
         # Sliders group
-        group = QGroupBox("Color Tuning", container)
-        g_layout = QVBoxLayout(group)
+        self.group = QGroupBox(t("panel.adjustments.title", default="Color Tuning"), container)
+        g_layout = QVBoxLayout(self.group)
         g_layout.setSpacing(12)
 
         # Brightness (-100 to 100)
-        self.b_slider, self.b_val_label = self._create_slider_row("Brightness:", g_layout)
+        self.b_lbl, self.b_slider, self.b_val_label = self._create_slider_row(
+            t("panel.adjustments.brightness", default="Brightness") + ":", g_layout
+        )
         # Contrast (-100 to 100)
-        self.c_slider, self.c_val_label = self._create_slider_row("Contrast:", g_layout)
+        self.c_lbl, self.c_slider, self.c_val_label = self._create_slider_row(
+            t("panel.adjustments.contrast", default="Contrast") + ":", g_layout
+        )
         # Saturation (-100 to 100)
-        self.s_slider, self.s_val_label = self._create_slider_row("Saturation:", g_layout)
+        self.s_lbl, self.s_slider, self.s_val_label = self._create_slider_row(
+            t("panel.adjustments.saturation", default="Saturation") + ":", g_layout
+        )
         # Sharpness (-100 to 100)
-        self.sh_slider, self.sh_val_label = self._create_slider_row("Sharpness:", g_layout)
+        self.sh_lbl, self.sh_slider, self.sh_val_label = self._create_slider_row(
+            t("filter.sharpen", default="Sharpness") + ":", g_layout
+        )
 
-        layout.addWidget(group)
+        layout.addWidget(self.group)
 
         # Compare Button
-        self.compare_btn = QPushButton("Hold to Compare Original", container)
+        self.compare_btn = QPushButton(t("panel.adjustments.compare", default="Hold to Compare Original"), container)
         self.compare_btn.pressed.connect(self._on_compare_pressed)
         self.compare_btn.released.connect(self._on_compare_released)
         layout.addWidget(self.compare_btn)
@@ -66,11 +76,11 @@ class AdjustmentDock(QDockWidget):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(8)
 
-        reset_btn = QPushButton("Reset All", container)
-        reset_btn.clicked.connect(self.reset_all)
-        btn_layout.addWidget(reset_btn)
+        self.reset_btn = QPushButton(t("panel.adjustments.reset", default="Reset All"), container)
+        self.reset_btn.clicked.connect(self.reset_all)
+        btn_layout.addWidget(self.reset_btn)
 
-        self.apply_btn = QPushButton("Apply", container)
+        self.apply_btn = QPushButton(t("panel.adjustments.apply", default="Apply"), container)
         self.apply_btn.setObjectName("PrimaryAction")
         self.apply_btn.clicked.connect(self._on_apply)
         btn_layout.addWidget(self.apply_btn)
@@ -97,50 +107,59 @@ class AdjustmentDock(QDockWidget):
         slider.valueChanged.connect(lambda v, l=val_lbl: self._on_slider_changed(v, l))
         parent_layout.addWidget(slider)
 
-        return slider, val_lbl
+        return lbl, slider, val_lbl
 
     def _on_slider_changed(self, val: int, label: QLabel):
-        prefix = "+" if val > 0 else ""
-        label.setText(f"{prefix}{val}%")
-        b, c, s, sh = self._get_factors()
+        label.setText(f"{val}%")
+        self._emit_preview()
+
+    def _emit_preview(self):
+        b = self.b_slider.value() / 100.0
+        c = self.c_slider.value() / 100.0
+        s = self.s_slider.value() / 100.0
+        sh = self.sh_slider.value() / 100.0
         self.preview_requested.emit(b, c, s, sh)
-
-    def _get_factors(self):
-        # Maps -100..0..100 to 0.0..1.0..2.0
-        b = 1.0 + (self.b_slider.value() / 100.0)
-        c = 1.0 + (self.c_slider.value() / 100.0)
-        s = 1.0 + (self.s_slider.value() / 100.0)
-        sh = 1.0 + (self.sh_slider.value() / 100.0)
-        return max(0.0, b), max(0.0, c), max(0.0, s), max(0.0, sh)
-
-    def _on_apply(self):
-        b, c, s, sh = self._get_factors()
-        self.adjustments_applied.emit(b, c, s, sh)
-        self.reset_all()
 
     def _on_compare_pressed(self):
         self.reset_preview_requested.emit()
 
     def _on_compare_released(self):
-        b, c, s, sh = self._get_factors()
-        self.preview_requested.emit(b, c, s, sh)
+        self._emit_preview()
+
+    def _on_apply(self):
+        b = self.b_slider.value() / 100.0
+        c = self.c_slider.value() / 100.0
+        s = self.s_slider.value() / 100.0
+        sh = self.sh_slider.value() / 100.0
+        self.adjustments_applied.emit(b, c, s, sh)
 
     def reset_all(self):
-        # Block signals temporarily to prevent multiple emits
-        self.b_slider.blockSignals(True)
-        self.c_slider.blockSignals(True)
-        self.s_slider.blockSignals(True)
-        self.sh_slider.blockSignals(True)
-        self.b_slider.setValue(0)
-        self.c_slider.setValue(0)
-        self.s_slider.setValue(0)
-        self.sh_slider.setValue(0)
-        self.b_val_label.setText("0%")
-        self.c_val_label.setText("0%")
-        self.s_val_label.setText("0%")
-        self.sh_val_label.setText("0%")
-        self.b_slider.blockSignals(False)
-        self.c_slider.blockSignals(False)
-        self.s_slider.blockSignals(False)
-        self.sh_slider.blockSignals(False)
+        for s in (self.b_slider, self.c_slider, self.s_slider, self.sh_slider):
+            s.blockSignals(True)
+            s.setValue(0)
+            s.blockSignals(False)
+
+        for l in (self.b_val_label, self.c_val_label, self.s_val_label, self.sh_val_label):
+            l.setText("0%")
+
         self.reset_preview_requested.emit()
+
+    def retranslate_ui(self):
+        """Update texts when application language changes."""
+        self.setWindowTitle(t("panel.adjustments.title", default="Adjustments"))
+        if hasattr(self, "group"):
+            self.group.setTitle(t("panel.adjustments.title", default="Color Tuning"))
+        if hasattr(self, "b_lbl"):
+            self.b_lbl.setText(t("panel.adjustments.brightness", default="Brightness") + ":")
+        if hasattr(self, "c_lbl"):
+            self.c_lbl.setText(t("panel.adjustments.contrast", default="Contrast") + ":")
+        if hasattr(self, "s_lbl"):
+            self.s_lbl.setText(t("panel.adjustments.saturation", default="Saturation") + ":")
+        if hasattr(self, "sh_lbl"):
+            self.sh_lbl.setText(t("filter.sharpen", default="Sharpness") + ":")
+        if hasattr(self, "compare_btn"):
+            self.compare_btn.setText(t("panel.adjustments.compare", default="Hold to Compare Original"))
+        if hasattr(self, "reset_btn"):
+            self.reset_btn.setText(t("panel.adjustments.reset", default="Reset All"))
+        if hasattr(self, "apply_btn"):
+            self.apply_btn.setText(t("panel.adjustments.apply", default="Apply"))

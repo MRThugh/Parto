@@ -334,6 +334,11 @@ class BrushStudioDock(QDockWidget):
     def _on_theme_changed(self, _: str) -> None:
         self._sync_from_settings()
 
+    def retranslate_ui(self) -> None:
+        """Update brush studio dock title with active language."""
+        from parto.localization import t
+        self.setWindowTitle(t("brush.studio", default="Brush Studio"))
+
 
 # Compatibility Aliases
 BrushDock = BrushStudioDock

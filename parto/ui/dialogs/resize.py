@@ -22,12 +22,15 @@ from PySide6.QtWidgets import (
 )
 
 
+from parto.localization import t
+
+
 class ResizeDialog(QDialog):
     """Dialog configuring image resize dimensions and resampling algorithms."""
 
     def __init__(self, current_width: int, current_height: int, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.setWindowTitle("Resize Image — Parto")
+        self.setWindowTitle(t("dialog.resize.title", default="Resize Image — Parto"))
         self.setModal(True)
         self.setMinimumSize(420, 390)
         self.resize(440, 410)
@@ -51,7 +54,7 @@ class ResizeDialog(QDialog):
 
         # Width
         w_row = QHBoxLayout()
-        w_row.addWidget(QLabel("Width:", self))
+        w_row.addWidget(QLabel(t("dialog.resize.width", default="Width:"), self))
         self.width_spin = QSpinBox(self)
         self.width_spin.setRange(1, 65536)
         self.width_spin.setValue(self.orig_w)
@@ -61,7 +64,7 @@ class ResizeDialog(QDialog):
 
         # Height
         h_row = QHBoxLayout()
-        h_row.addWidget(QLabel("Height:", self))
+        h_row.addWidget(QLabel(t("dialog.resize.height", default="Height:"), self))
         self.height_spin = QSpinBox(self)
         self.height_spin.setRange(1, 65536)
         self.height_spin.setValue(self.orig_h)
@@ -70,7 +73,7 @@ class ResizeDialog(QDialog):
         dim_layout.addLayout(h_row)
 
         # Aspect lock checkbox
-        self.lock_aspect_cb = QCheckBox("Maintain Aspect Ratio", self)
+        self.lock_aspect_cb = QCheckBox(t("dialog.resize.proportions", default="Maintain Aspect Ratio"), self)
         self.lock_aspect_cb.setChecked(True)
         self.lock_aspect_cb.toggled.connect(self._on_lock_toggled)
         dim_layout.addWidget(self.lock_aspect_cb)
@@ -113,11 +116,11 @@ class ResizeDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(10)
 
-        cancel_btn = QPushButton("Cancel", self)
+        cancel_btn = QPushButton(t("dialog.common.cancel", default="Cancel"), self)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
-        self.apply_btn = QPushButton("Apply", self)
+        self.apply_btn = QPushButton(t("dialog.common.apply", default="Apply"), self)
         self.apply_btn.setObjectName("PrimaryAction")
         self.apply_btn.clicked.connect(self.accept)
         btn_layout.addWidget(self.apply_btn)

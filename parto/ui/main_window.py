@@ -108,6 +108,13 @@ class MainWindow(QMainWindow):
         # Toast notification
         self.toast = Toast(self)
 
+        # Localization Subsystem Integration
+        from ..localization import get_localization_manager, t
+        self.localization_manager = get_localization_manager()
+        self.localization_manager.locale_changed.connect(self._on_locale_changed)
+        if self.localization_manager.is_rtl:
+            self.setLayoutDirection(Qt.RightToLeft)
+
         # Connect Document & Canvas Signals
         self.document.document_changed.connect(self._on_document_changed)
         self.document.modified_changed.connect(self._update_window_title)
@@ -330,14 +337,52 @@ class MainWindow(QMainWindow):
             self.action_manager.update_states()
 
     def _update_window_title(self, *_: Any):
+        from ..localization import t
         fp = self.document.filepath
         fname = os.path.basename(fp) if fp else ("Untitled" if self.document.has_image else "")
         mod_mark = " *" if self.document.is_modified else ""
 
         if fname:
-            self.setWindowTitle(f"Parto — {fname}{mod_mark}")
+            self.setWindowTitle(t("app.window_title_with_file", filename=f"{fname}{mod_mark}", default=f"Parto — {fname}{mod_mark}"))
         else:
-            self.setWindowTitle("Parto — Lightweight Image Editor")
+            self.setWindowTitle(t("app.window_title", default="Parto — Lightweight Image Editor"))
+
+    def _on_locale_changed(self, locale_id: str):
+        """
+        Handle dynamic runtime language switch:
+        - Update application and window layout directions (LTR <-> RTL)
+        - Refresh window title and all UI component texts
+        - Preserves all document, canvas, layers, history, tool, and theme state
+        """
+        from ..localization import t
+        is_rtl = self.localization_manager.is_rtl
+        target_dir = Qt.RightToLeft if is_rtl else Qt.LeftToRight
+        self.setLayoutDirection(target_dir)
+
+        self._update_window_title()
+
+        if hasattr(self, "toolbar") and hasattr(self.toolbar, "retranslate_ui"):
+            self.toolbar.retranslate_ui()
+        if hasattr(self, "statusbar") and hasattr(self.statusbar, "retranslate_ui"):
+            self.statusbar.retranslate_ui()
+        if hasattr(self, "welcome_screen") and hasattr(self.welcome_screen, "retranslate_ui"):
+            self.welcome_screen.retranslate_ui()
+        if hasattr(self, "crop_bar") and hasattr(self.crop_bar, "retranslate_ui"):
+            self.crop_bar.retranslate_ui()
+        if hasattr(self, "brush_bar") and hasattr(self.brush_bar, "retranslate_ui"):
+            self.brush_bar.retranslate_ui()
+        if hasattr(self, "layers_dock") and hasattr(self.layers_dock, "retranslate_ui"):
+            self.layers_dock.retranslate_ui()
+        if hasattr(self, "adjustments_dock") and hasattr(self.adjustments_dock, "retranslate_ui"):
+            self.adjustments_dock.retranslate_ui()
+        if hasattr(self, "brush_dock") and hasattr(self.brush_dock, "retranslate_ui"):
+            self.brush_dock.retranslate_ui()
+
+        EditorMenuBar.retranslate_menus(self.menuBar(), self)
+
+        lang_name = self.localization_manager.current_metadata.native_name
+        if hasattr(self, "toast"):
+            self.toast.show_message(t("toast.language_switched", language=lang_name, default=f"Language changed to {lang_name}"))
 
     def _update_history_actions(self):
         can_u = self.document.history.can_undo

@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QWidget,
 )
+from parto.localization import t
 
 
 class CommandPalette(QDialog):
@@ -34,7 +35,7 @@ class CommandPalette(QDialog):
         commands: list of Action objects or tuples (action_id, display_name, shortcut_str, callback)
         """
         super().__init__(parent)
-        self.setWindowTitle("Command Palette — Parto")
+        self.setWindowTitle(t("dialog.palette.title", default="Command Palette — Parto"))
         self.setModal(True)
         self.setMinimumSize(480, 320)
         self.resize(560, 360)
@@ -92,7 +93,7 @@ class CommandPalette(QDialog):
         layout.setSpacing(8)
 
         self.search_input = QLineEdit(self)
-        self.search_input.setPlaceholderText("Type a command or search action...")
+        self.search_input.setPlaceholderText(t("dialog.palette.placeholder", default="Type a command or search action..."))
         self.search_input.textChanged.connect(self._filter_commands)
         layout.addWidget(self.search_input)
 

@@ -47,6 +47,13 @@ def main():
     # Initialize theme subsystem
     get_theme_manager().apply_to_application()
 
+    # Initialize localization subsystem
+    from parto.localization import get_localization_manager
+    lm = get_localization_manager()
+    if lm.is_rtl:
+        from PySide6.QtCore import Qt
+        app.setLayoutDirection(Qt.RightToLeft)
+
     # Set crisp application vector icon
     logo_path = resource_path("logo.png")
     if os.path.exists(logo_path):

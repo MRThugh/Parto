@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 from parto.editor.document import Document
 from parto.resources.icons import get_parto_icon
 from parto.themes.manager import get_theme_manager
+from parto.localization import t
 
 
 class LayerItemWidget(QWidget):
@@ -107,9 +108,9 @@ class LayersDock(QDockWidget):
 
         # Opacity Control Row
         op_layout = QHBoxLayout()
-        op_lbl = QLabel("Opacity:", self)
-        op_lbl.setStyleSheet("font-size: 12px; font-weight: 500;")
-        op_layout.addWidget(op_lbl)
+        self.op_lbl = QLabel(t("panel.layers.opacity", default="Opacity:"), self)
+        self.op_lbl.setStyleSheet("font-size: 12px; font-weight: 500;")
+        op_layout.addWidget(self.op_lbl)
 
         self.opacity_slider = QSlider(Qt.Horizontal, self)
         self.opacity_slider.setRange(0, 100)
@@ -139,19 +140,19 @@ class LayersDock(QDockWidget):
 
         self.add_btn = QToolButton(self)
         self.add_btn.setIcon(get_parto_icon("layer-add", icon_color, 18))
-        self.add_btn.setToolTip("Add New Layer")
+        self.add_btn.setToolTip(t("action.layer.new", default="Add New Layer"))
         self.add_btn.clicked.connect(self._on_add_layer)
         btn_layout.addWidget(self.add_btn)
 
         self.dup_btn = QToolButton(self)
         self.dup_btn.setIcon(get_parto_icon("layer-duplicate", icon_color, 18))
-        self.dup_btn.setToolTip("Duplicate Active Layer")
+        self.dup_btn.setToolTip(t("action.layer.duplicate", default="Duplicate Active Layer"))
         self.dup_btn.clicked.connect(self._on_duplicate_layer)
         btn_layout.addWidget(self.dup_btn)
 
         self.del_btn = QToolButton(self)
         self.del_btn.setIcon(get_parto_icon("layer-delete", "#ef4444", 18))
-        self.del_btn.setToolTip("Delete Active Layer")
+        self.del_btn.setToolTip(t("action.layer.delete", default="Delete Active Layer"))
         self.del_btn.clicked.connect(self._on_delete_layer)
         btn_layout.addWidget(self.del_btn)
 
@@ -159,19 +160,19 @@ class LayersDock(QDockWidget):
 
         self.up_btn = QToolButton(self)
         self.up_btn.setIcon(get_parto_icon("layer-up", icon_color, 18))
-        self.up_btn.setToolTip("Move Layer Up")
+        self.up_btn.setToolTip(t("action.layer.move_up", default="Move Layer Up"))
         self.up_btn.clicked.connect(self.document.move_layer_up)
         btn_layout.addWidget(self.up_btn)
 
         self.down_btn = QToolButton(self)
         self.down_btn.setIcon(get_parto_icon("layer-down", icon_color, 18))
-        self.down_btn.setToolTip("Move Layer Down")
+        self.down_btn.setToolTip(t("action.layer.move_down", default="Move Layer Down"))
         self.down_btn.clicked.connect(self.document.move_layer_down)
         btn_layout.addWidget(self.down_btn)
 
         self.merge_btn = QToolButton(self)
         self.merge_btn.setIcon(get_parto_icon("layer-merge", icon_color, 18))
-        self.merge_btn.setToolTip("Merge Down")
+        self.merge_btn.setToolTip(t("action.layer.merge_down", default="Merge Down"))
         self.merge_btn.clicked.connect(self.document.merge_down)
         btn_layout.addWidget(self.merge_btn)
 
@@ -283,3 +284,22 @@ class LayersDock(QDockWidget):
 
     def _on_delete_layer(self):
         self.document.remove_active_layer()
+
+    def retranslate_ui(self):
+        """Update layers dock title, tooltips, and labels with current locale."""
+        self.setWindowTitle(t("panel.layers.title", default="Layers"))
+        if hasattr(self, "op_lbl"):
+            self.op_lbl.setText(t("panel.layers.opacity", default="Opacity:"))
+        if hasattr(self, "add_btn"):
+            self.add_btn.setToolTip(t("action.layer.new", default="Add New Layer"))
+        if hasattr(self, "dup_btn"):
+            self.dup_btn.setToolTip(t("action.layer.duplicate", default="Duplicate Active Layer"))
+        if hasattr(self, "del_btn"):
+            self.del_btn.setToolTip(t("action.layer.delete", default="Delete Active Layer"))
+        if hasattr(self, "up_btn"):
+            self.up_btn.setToolTip(t("action.layer.move_up", default="Move Layer Up"))
+        if hasattr(self, "down_btn"):
+            self.down_btn.setToolTip(t("action.layer.move_down", default="Move Layer Down"))
+        if hasattr(self, "merge_btn"):
+            self.merge_btn.setToolTip(t("action.layer.merge_down", default="Merge Down"))
+        self.refresh_layers()

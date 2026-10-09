@@ -332,6 +332,19 @@ class ShortcutManager:
                 return defn
         return None
 
+    def update_metadata(self, action_id: str, name: str, description: Optional[str] = None) -> None:
+        """Update display name and description for an action shortcut definition."""
+        resolved = self._resolve_id(action_id)
+        defn = self._shortcuts.get(resolved)
+        if defn:
+            defn.name = name
+            if description is not None:
+                defn.description = description
+            if defn.action:
+                defn.action.setText(name)
+                if description:
+                    defn.action.setToolTip(description)
+
     def reset_to_defaults(self) -> None:
         """Reset all shortcuts to their original default bindings."""
         for action_id, def_key in self._default_shortcuts.items():

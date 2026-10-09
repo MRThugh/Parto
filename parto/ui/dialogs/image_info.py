@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QWidget,
 )
+from parto.localization import t
 
 
 class ImageInfoDialog(QDialog):
@@ -28,7 +29,7 @@ class ImageInfoDialog(QDialog):
 
     def __init__(self, metadata: Dict[str, Any], parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.setWindowTitle("Image Properties — Parto")
+        self.setWindowTitle(t("dialog.info.title", default="Image Properties — Parto"))
         self.setModal(True)
         self.setMinimumSize(480, 380)
         self.resize(520, 420)
@@ -44,7 +45,10 @@ class ImageInfoDialog(QDialog):
         # Properties Table
         self.table = QTableWidget(self)
         self.table.setColumnCount(2)
-        self.table.setHorizontalHeaderLabels(["Property", "Value"])
+        self.table.setHorizontalHeaderLabels([
+            t("dialog.info.prop", default="Property"),
+            t("dialog.info.value", default="Value"),
+        ])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.verticalHeader().setVisible(False)

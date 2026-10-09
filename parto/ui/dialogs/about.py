@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 from parto import __version__, __author__
 from parto.resources.icons import get_parto_icon
+from parto.localization import t
 
 
 class AboutDialog(QDialog):
@@ -24,7 +25,7 @@ class AboutDialog(QDialog):
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.setWindowTitle("About Parto")
+        self.setWindowTitle(t("dialog.about.title", default="About Parto"))
         self.setModal(True)
         self.setMinimumSize(440, 370)
         self.resize(460, 390)
@@ -74,7 +75,7 @@ class AboutDialog(QDialog):
         layout.addSpacing(10)
 
         # Close
-        close_btn = QPushButton("Close", self)
+        close_btn = QPushButton(t("dialog.common.close", default="Close"), self)
         close_btn.setObjectName("PrimaryAction")
         close_btn.clicked.connect(self.accept)
         layout.addWidget(close_btn, alignment=Qt.AlignCenter)

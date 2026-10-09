@@ -1,12 +1,12 @@
 # parto/ui/statusbar.py
 """
-Parto v0.3.0 - Rich Editor Status Bar with Real-Time Pixel & Coordinate Telemetry
+Parto v0.4.0 - Rich Editor Status Bar with Real-Time Pixel & Coordinate Telemetry
 Theme-aware swatches, coordinates, resolution, aspect ratio, megapixels, and zoom level.
 Author: Ali Kamrani (MRThugh)
 """
 
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, Tuple
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QStatusBar,
@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QFrame,
 )
 from ..themes.manager import get_theme_manager
+from ..localization import t
 
 
 class EditorStatusBar(QStatusBar):
@@ -30,6 +31,7 @@ class EditorStatusBar(QStatusBar):
         self.setSizeGripEnabled(False)
 
         self._current_rgba = None
+        self._last_info: Optional[Tuple[int, int, str, str]] = None
         self._init_widgets()
         get_theme_manager().theme_changed.connect(self._on_theme_changed)
 
@@ -61,7 +63,7 @@ class EditorStatusBar(QStatusBar):
         self.addPermanentWidget(color_container)
 
         # 3. Dimensions & Megapixels
-        self.dim_label = QLabel("No Image", self)
+        self.dim_label = QLabel(t("status.no_image"), self)
         self.dim_label.setMinimumWidth(180)
         self.addPermanentWidget(self.dim_label)
 
@@ -98,11 +100,24 @@ class EditorStatusBar(QStatusBar):
         self.color_label.setText("RGB: —")
 
     def set_image_info(self, width: int, height: int, aspect_ratio: str, megapixels: str):
+        self._last_info = (width, height, aspect_ratio, megapixels)
         if width > 0 and height > 0:
-            self.dim_label.setText(f"{width} × {height} px  ({aspect_ratio}, {megapixels})")
+            formatted = t("status.dimensions", width=width, height=height, aspect_ratio=aspect_ratio, megapixels=megapixels)
+            self.dim_label.setText(formatted)
         else:
-            self.dim_label.setText("No Image")
+            self.dim_label.setText(t("status.no_image"))
 
     def set_zoom(self, factor: float):
         pct = int(round(factor * 100))
         self.zoom_label.setText(f"{pct}%")
+
+    def retranslate_ui(self) -> None:
+        """Update status bar textual elements with active language."""
+        if self._last_info:
+            w, h, ar, mp = self._last_info
+            if w > 0 and h > 0:
+                self.dim_label.setText(t("status.dimensions", width=w, height=h, aspect_ratio=ar, megapixels=mp))
+            else:
+                self.dim_label.setText(t("status.no_image"))
+        else:
+            self.dim_label.setText(t("status.no_image"))
