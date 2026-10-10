@@ -36,6 +36,8 @@ from parto.localization.validator import (
     scan_codebase_translation_keys,
     validate_catalog_parity,
     validate_codebase_key_coverage,
+    get_dynamic_codebase_translation_keys,
+    validate_dynamic_key_coverage,
 )
 
 
@@ -307,3 +309,29 @@ def test_resolve_translation_entry_missing_category_fallback():
 
     entry_plain = "Simple plain text"
     assert resolve_translation_entry(entry_plain, count=1, locale_id="en") == "Simple plain text"
+
+
+# -----------------------------------------------------------------------------
+# 5. Dynamic Key Coverage & AST Scanner Robustness Tests
+# -----------------------------------------------------------------------------
+
+def test_dynamic_translation_keys_covered_in_catalogs(bundled_catalogs):
+    """Verify that all dynamically generated keys (e.g. filter.{f_id}) exist in en and fa catalogs."""
+    cat_en, cat_fa = bundled_catalogs
+    dynamic_keys = get_dynamic_codebase_translation_keys()
+    assert len(dynamic_keys) > 0, "No dynamic translation keys returned"
+
+    ok_en, missing_en = validate_dynamic_key_coverage(cat_en)
+    assert ok_en, f"Missing dynamic keys in English catalog: {missing_en}"
+
+    ok_fa, missing_fa = validate_dynamic_key_coverage(cat_fa)
+    assert ok_fa, f"Missing dynamic keys in Persian catalog: {missing_fa}"
+
+
+def test_static_scanner_handles_tuples_and_lists(repo_root):
+    """Verify that AST scanner detects translation keys defined in tuples/lists (e.g. crop.ratio.*)."""
+    codebase_keys_map = scan_codebase_translation_keys(repo_root)
+    assert "crop.ratio.freeform" in codebase_keys_map, "crop.ratio.freeform was not detected from tuple/list"
+    assert "crop.ratio.square" in codebase_keys_map, "crop.ratio.square was not detected from tuple/list"
+    assert "crop.ratio.widescreen" in codebase_keys_map, "crop.ratio.widescreen was not detected from tuple/list"
+

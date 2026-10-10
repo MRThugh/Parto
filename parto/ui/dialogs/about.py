@@ -51,20 +51,23 @@ class AboutDialog(QDialog):
         title_label.setStyleSheet("font-size: 20px; font-weight: 700; margin-top: 4px;")
         layout.addWidget(title_label)
 
-        desc_label = QLabel(
-            "A fast, modern, and lightweight desktop image editor\n"
-            "built with Python, PySide6, and Pillow.",
-            self,
+        tagline = t(
+            "app.tagline",
+            default="A fast, modern, and lightweight desktop image editor\nbuilt with Python, PySide6, and Pillow.",
         )
+        desc_label = QLabel(tagline, self)
         desc_label.setAlignment(Qt.AlignCenter)
         desc_label.setStyleSheet("font-size: 12px; color: #a1a1aa; line-height: 1.4;")
         layout.addWidget(desc_label)
 
         # Author & Repo info
+        lbl_author = t("app.author", default="Author & Maintainer")
+        lbl_license = t("app.license", default="License")
+        lbl_repo = t("app.repository", default="Repository")
         author_label = QLabel(
-            f"<b>Author & Maintainer:</b> {__author__}<br>"
-            "<b>License:</b> MIT Open Source<br>"
-            "<b>Repository:</b> <a style='color: #0284c7;' href='https://github.com/MRThugh/Parto'>github.com/MRThugh/Parto</a>",
+            f"<b>{lbl_author}:</b> {__author__}<br>"
+            f"<b>{lbl_license}:</b> MIT Open Source<br>"
+            f"<b>{lbl_repo}:</b> <a style='color: #0284c7;' href='https://github.com/MRThugh/Parto'>github.com/MRThugh/Parto</a>",
             self,
         )
         author_label.setOpenExternalLinks(True)

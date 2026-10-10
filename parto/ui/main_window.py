@@ -34,6 +34,7 @@ from ..themes.manager import get_theme_manager
 from ..resources.icons import get_parto_icon
 from ..shortcuts.manager import get_shortcut_manager
 from ..workers.image_worker import AsyncOperationRunner
+from ..localization import t
 
 from .widgets.welcome import WelcomeScreen
 from .widgets.crop_bar import CropBar
@@ -454,10 +455,11 @@ class MainWindow(QMainWindow):
         if not self.document.is_modified:
             return True
 
+        fname = os.path.basename(self.document.filepath) if self.document.filepath else "Untitled"
         ans = QMessageBox.question(
             self,
-            "Unsaved Changes",
-            "Do you want to save changes before continuing?",
+            t("dialog.unsaved.title", default="Unsaved Changes"),
+            t("dialog.unsaved.message", filename=fname, default=f'Save changes to "{fname}" before closing?'),
             QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel,
             QMessageBox.Save,
         )
@@ -486,7 +488,12 @@ class MainWindow(QMainWindow):
             "WebP Files (*.webp);;"
             "All Files (*.*)"
         )
-        path, _ = QFileDialog.getOpenFileName(self, "Open Image — Parto", "", file_filter)
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            t("dialog.open.title", default="Open Image — Parto"),
+            "",
+            file_filter,
+        )
         if path:
             self.open_image_file(path, check_unsaved=False)
 
@@ -532,7 +539,8 @@ class MainWindow(QMainWindow):
 
         success, err = self.document.save_file()
         if success:
-            self.toast.show_message(f"Saved {os.path.basename(self.document.filepath)}")
+            saved_name = os.path.basename(self.document.filepath)
+            self.toast.show_message(t("toast.saved", filename=saved_name, default=f"Saved {saved_name}"))
             return SaveResult.SUCCESS
         else:
             QMessageBox.critical(self, "Save Error", f"Could not save file: {err}")
@@ -547,11 +555,17 @@ class MainWindow(QMainWindow):
             "TIFF Image (*.tiff)"
         )
         default_name = self.document.filepath or "Untitled.png"
-        path, _ = QFileDialog.getSaveFileName(self, "Save Image As — Parto", default_name, file_filter)
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            t("dialog.save_as.title", default="Save Image As — Parto"),
+            default_name,
+            file_filter,
+        )
         if path:
             success, err = self.document.save_file(path)
             if success:
-                self.toast.show_message(f"Saved as {os.path.basename(path)}")
+                saved_name = os.path.basename(path)
+                self.toast.show_message(t("toast.saved", filename=saved_name, default=f"Saved {saved_name}"))
                 return SaveResult.SUCCESS
             else:
                 QMessageBox.critical(self, "Save Error", f"Could not save file: {err}")
@@ -589,7 +603,7 @@ class MainWindow(QMainWindow):
             resample = dlg.get_resample_filter()
             self.document.resize_document(nw, nh, resample=resample)
             self.canvas.zoom_fit()
-            self.toast.show_message(f"Resized image to {nw} × {nh} px")
+            self.toast.show_message(t("toast.image_resized", default=f"Resized image to {nw} × {nh} px"))
 
     # Tool Switching
     def action_tool_move(self):
@@ -623,7 +637,7 @@ class MainWindow(QMainWindow):
         self.action_tool_move()
         self.document.crop_document(rect)
         self.canvas.zoom_fit()
-        self.toast.show_message(f"Cropped to {self.document.width} × {self.document.height} px")
+        self.toast.show_message(t("toast.canvas_cropped", default=f"Cropped to {self.document.width} × {self.document.height} px"))
 
     def cancel_crop(self):
         self.action_tool_move()
@@ -731,7 +745,7 @@ class MainWindow(QMainWindow):
         if dlg.exec():
             fname = dlg.get_filter_name()
             self.document.apply_filter(fname)
-            self.toast.show_message(f"Applied {fname.title()} filter")
+            self.toast.show_message(t("toast.applied_filter", filter=fname.title(), default=f"Applied {fname.title()} filter"))
 
     # Command Palette & Cheat Sheet
     def action_show_command_palette(self):
@@ -758,8 +772,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, "document") and self.document.has_image:
             self.document.remove_background(tolerance=tolerance, feather_radius=feather_radius)
             self.canvas.update_composite_pixmap()
-            self.statusbar.set_status("Removed background")
-            self.toast.show_message("Background removed")
+            self.toast.show_message(t("toast.bg_removed", default="Background removed"))
 
     def remove_background(self, tolerance: int = 28, feather_radius: int = 2):
         self.apply_remove_background(tolerance=tolerance, feather_radius=feather_radius)
