@@ -53,6 +53,11 @@ class CatalogValidationError(CatalogError):
     pass
 
 
+class DuplicateCatalogError(CatalogError):
+    """Raised when registering a catalog that is already registered without explicit replacement."""
+    pass
+
+
 class InvalidLocaleIdentifierError(LocalizationError):
     """Raised when a language identifier is malformed or invalid."""
     pass
@@ -65,21 +70,64 @@ class LocaleSwitchError(LocalizationError):
 
 def is_valid_locale_id(locale_id: Any) -> bool:
     """
-    Validate BCP 47 compliant language identifier.
+    Validate BCP 47 compliant language identifier syntax.
     Rejects path traversal, null bytes, separators, and non-alphanumeric patterns.
-    Valid examples: 'en', 'fa', 'en-US', 'fa_IR', 'zh-Hans'.
+    Valid examples: 'en', 'fa', 'en-US', 'pt-BR', 'fa_IR', 'zh-Hans', 'sr-Latn-RS'.
     """
     if not isinstance(locale_id, str):
         return False
     lid = locale_id.strip()
-    if not lid or len(lid) > 15:
+    if not lid or len(lid) > 35:
         return False
     # Path traversal and injection defense
-    if "/" in lid or "\\" in lid or ".." in lid or "\0" in lid:
+    if any(c in lid for c in ("/", "\\", "..", "\0", " ", "\t", "\n", "\r", ":", "*", "?", '"', "<", ">", "|")):
         return False
     import re
-    # Match standard language tags (2-3 letter primary code optionally followed by subtag)
-    return bool(re.match(r"^[a-zA-Z]{2,3}(?:[-_][a-zA-Z0-9]{2,8})*$", lid))
+    pattern = r"^[a-zA-Z]{2,3}(?:[-_][a-zA-Z]{4})?(?:[-_](?:[a-zA-Z]{2}|[0-9]{3}))?(?:[-_][a-zA-Z0-9]{1,8})*$"
+    return bool(re.match(pattern, lid))
+
+
+def canonicalize_locale_id(locale_id: str) -> str:
+    """
+    Canonicalize a valid locale identifier into standard BCP 47 casing (e.g. 'en', 'en-US', 'pt-BR', 'zh-Hans').
+    Hyphens are used as the canonical subtag separator.
+    """
+    if not is_valid_locale_id(locale_id):
+        raise InvalidLocaleIdentifierError(f"Invalid or malformed locale identifier: {locale_id!r}")
+
+    lid = locale_id.strip()
+    sep = "_" if "_" in lid else "-"
+
+    # Attempt Babel parsing if available
+    try:
+        from babel import Locale as BabelLocale
+        loc = BabelLocale.parse(lid, sep=sep)
+        parts = [loc.language.lower()]
+        if loc.script:
+            parts.append(loc.script.title())
+        if loc.territory:
+            parts.append(loc.territory.upper())
+        if loc.variant:
+            parts.append(str(loc.variant).lower())
+        return "-".join(parts)
+    except Exception:
+        pass
+
+    # Pure Python BCP 47 canonicalization fallback
+    import re
+    tokens = re.split(r"[-_]", lid)
+    parts = [tokens[0].lower()]
+    for token in tokens[1:]:
+        if len(token) == 4 and token.isalpha():
+            parts.append(token.title())
+        elif (len(token) == 2 and token.isalpha()) or (len(token) == 3 and token.isdigit()):
+            parts.append(token.upper())
+        else:
+            parts.append(token.lower())
+    return "-".join(parts)
+
+
+normalize_locale_id = canonicalize_locale_id
 
 
 @dataclass(frozen=True)
@@ -115,7 +163,8 @@ class LocaleMetadata:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> LocaleMetadata:
-        lang_id = str(data.get("id", "")).strip()
+        raw_id = str(data.get("id", "")).strip()
+        lang_id = canonicalize_locale_id(raw_id) if is_valid_locale_id(raw_id) else raw_id
         name = str(data.get("name", lang_id)).strip()
         native_name = str(data.get("native_name", name)).strip()
         dir_val = data.get("direction", "ltr")

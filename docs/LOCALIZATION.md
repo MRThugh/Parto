@@ -30,18 +30,19 @@ parto/
 │   ├── models.py             # Domain models (LocaleMetadata, TextDirection, DiagnosticRecord, validation)
 │   ├── catalog.py            # TranslationCatalog representation and validation
 │   ├── loader.py             # LanguageCatalogLoader for file discovery and JSON parsing
-│   ├── formatting.py         # safe_interpolate, pluralization rules, placeholder extractors
+│   ├── formatting.py         # safe_interpolate, Unicode CLDR plural rules via Babel & fallbacks
 │   ├── persistence.py        # LocalePreferences atomic settings read/write
+│   ├── validator.py          # AST static key coverage and catalog parity validator
 │   └── manager.py            # LocalizationManager singleton and Qt signal coordinator
 └── resources/
     └── locales/
         ├── en/
-        │   └── locale.json   # English factory catalog (191 keys, LTR)
+        │   └── locale.json   # English factory catalog (225 keys, LTR)
         └── fa/
-            └── locale.json   # Persian factory catalog (191 keys, RTL)
+            └── locale.json   # Persian factory catalog (225 keys, RTL)
 ```
 
-Both bundled catalogs (`en` and `fa`) contain exactly **191 translation keys** with 100% key parity and zero placeholder discrepancies.
+Both bundled catalogs (`en` and `fa`) contain exactly **225 translation keys** with 100% key parity, complete codebase coverage, and zero placeholder discrepancies.
 
 ---
 
@@ -301,10 +302,17 @@ msg_fa = lm.format_intent_response("intent.response.operation_completed", locale
 
 ## 13. How to Run Localization Tests
 
-### Localization Core Unit Suite (26 Tests — Pure Python):
+### Localization Unit Test Suites (44 Tests — Pure Python):
 Does not require GUI libraries or PySide6; runs using the built-in headless fallback emitter:
 ```bash
+# Core subsystem and lifecycle tests (26 tests)
 python3 -m pytest tests/unit/test_localization_core.py -v
+
+# Static key coverage, catalog parity, and multilingual CLDR plural tests (18 tests)
+python3 -m pytest tests/unit/test_localization_validation.py -v
+
+# Run all 44 localization unit tests together:
+python3 -m pytest tests/unit/test_localization_core.py tests/unit/test_localization_validation.py -v
 ```
 
 ### Editor State Preservation Integration Suite (2 Tests — Requires PySide6 & Pillow):
@@ -313,7 +321,7 @@ Verifies byte-for-byte preservation across language switches:
 QT_QPA_PLATFORM=offscreen python3 -m pytest tests/integration/test_locale_state_preservation.py -v
 ```
 
-### Combined Test Execution (When PySide6 is Installed):
+### Combined Test Execution (All 46 Tests):
 ```bash
-QT_QPA_PLATFORM=offscreen python3 -m pytest tests/unit/test_localization_core.py tests/integration/test_locale_state_preservation.py -v
+QT_QPA_PLATFORM=offscreen python3 -m pytest tests/unit/test_localization_core.py tests/unit/test_localization_validation.py tests/integration/test_locale_state_preservation.py -v
 ```

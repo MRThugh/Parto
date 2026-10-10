@@ -48,13 +48,14 @@ class ResizeDialog(QDialog):
         layout.setSpacing(16)
 
         # Dimension Inputs Group
-        dim_group = QGroupBox(t("dialog.resize.dimensions_group", default="Dimensions (Pixels)"), self)
-        dim_layout = QVBoxLayout(dim_group)
+        self.dim_group = QGroupBox(t("dialog.resize.dimensions_group", default="Dimensions (Pixels)"), self)
+        dim_layout = QVBoxLayout(self.dim_group)
         dim_layout.setSpacing(12)
 
         # Width
         w_row = QHBoxLayout()
-        w_row.addWidget(QLabel(t("dialog.resize.width", default="Width:"), self))
+        self.w_lbl = QLabel(t("dialog.resize.width", default="Width:"), self)
+        w_row.addWidget(self.w_lbl)
         self.width_spin = QSpinBox(self)
         self.width_spin.setRange(1, 65536)
         self.width_spin.setValue(self.orig_w)
@@ -64,7 +65,8 @@ class ResizeDialog(QDialog):
 
         # Height
         h_row = QHBoxLayout()
-        h_row.addWidget(QLabel(t("dialog.resize.height", default="Height:"), self))
+        self.h_lbl = QLabel(t("dialog.resize.height", default="Height:"), self)
+        h_row.addWidget(self.h_lbl)
         self.height_spin = QSpinBox(self)
         self.height_spin.setRange(1, 65536)
         self.height_spin.setValue(self.orig_h)
@@ -78,11 +80,11 @@ class ResizeDialog(QDialog):
         self.lock_aspect_cb.toggled.connect(self._on_lock_toggled)
         dim_layout.addWidget(self.lock_aspect_cb)
 
-        layout.addWidget(dim_group)
+        layout.addWidget(self.dim_group)
 
         # Presets
-        preset_group = QGroupBox(t("dialog.resize.quick_presets", default="Quick Presets"), self)
-        preset_layout = QHBoxLayout(preset_group)
+        self.preset_group = QGroupBox(t("dialog.resize.quick_presets", default="Quick Presets"), self)
+        preset_layout = QHBoxLayout(self.preset_group)
         preset_layout.setSpacing(6)
 
         for pct in (25, 50, 75, 100, 150, 200):
@@ -90,11 +92,12 @@ class ResizeDialog(QDialog):
             btn.clicked.connect(lambda _, p=pct: self._apply_preset(p))
             preset_layout.addWidget(btn)
 
-        layout.addWidget(preset_group)
+        layout.addWidget(self.preset_group)
 
         # Resampling Filter
         resample_layout = QHBoxLayout()
-        resample_layout.addWidget(QLabel(t("dialog.resize.resample", default="Resampling Quality:"), self))
+        self.resample_lbl = QLabel(t("dialog.resize.resample", default="Resampling Quality:"), self)
+        resample_layout.addWidget(self.resample_lbl)
         self.resample_combo = QComboBox(self)
         self.resample_combo.addItems([
             "Lanczos (Best Quality)",
@@ -116,9 +119,9 @@ class ResizeDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(10)
 
-        cancel_btn = QPushButton(t("dialog.common.cancel", default="Cancel"), self)
-        cancel_btn.clicked.connect(self.reject)
-        btn_layout.addWidget(cancel_btn)
+        self.cancel_btn = QPushButton(t("dialog.common.cancel", default="Cancel"), self)
+        self.cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(self.cancel_btn)
 
         self.apply_btn = QPushButton(t("dialog.common.apply", default="Apply"), self)
         self.apply_btn.setObjectName("PrimaryAction")
@@ -126,6 +129,27 @@ class ResizeDialog(QDialog):
         btn_layout.addWidget(self.apply_btn)
 
         layout.addLayout(btn_layout)
+
+    def retranslate_ui(self):
+        """Refresh dialog texts on locale change."""
+        self.setWindowTitle(t("dialog.resize.title", default="Resize Image"))
+        if hasattr(self, "dim_group"):
+            self.dim_group.setTitle(t("dialog.resize.dimensions_group", default="Dimensions (Pixels)"))
+        if hasattr(self, "w_lbl"):
+            self.w_lbl.setText(t("dialog.resize.width", default="Width:"))
+        if hasattr(self, "h_lbl"):
+            self.h_lbl.setText(t("dialog.resize.height", default="Height:"))
+        if hasattr(self, "lock_aspect_cb"):
+            self.lock_aspect_cb.setText(t("dialog.resize.proportions", default="Maintain Aspect Ratio"))
+        if hasattr(self, "preset_group"):
+            self.preset_group.setTitle(t("dialog.resize.quick_presets", default="Quick Presets"))
+        if hasattr(self, "resample_lbl"):
+            self.resample_lbl.setText(t("dialog.resize.resample", default="Resampling Quality:"))
+        if hasattr(self, "cancel_btn"):
+            self.cancel_btn.setText(t("dialog.common.cancel", default="Cancel"))
+        if hasattr(self, "apply_btn"):
+            self.apply_btn.setText(t("dialog.common.apply", default="Apply"))
+        self._update_info()
 
     def _on_width_changed(self, w: int):
         if self._updating:

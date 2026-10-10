@@ -28,23 +28,23 @@ class TranslationCatalog:
 
     @property
     def id(self) -> str:
-        return self.metadata.id
+        return self.metadata.id if self.metadata else ""
 
     @property
     def locale_id(self) -> str:
-        return self.metadata.id
+        return self.metadata.id if self.metadata else ""
 
     @property
     def name(self) -> str:
-        return self.metadata.name
+        return self.metadata.name if self.metadata else ""
 
     @property
     def native_name(self) -> str:
-        return self.metadata.native_name
+        return self.metadata.native_name if self.metadata else ""
 
     @property
     def direction(self) -> TextDirection:
-        return self.metadata.direction
+        return self.metadata.direction if self.metadata else TextDirection.LTR
 
     @property
     def is_rtl(self) -> bool:
@@ -103,10 +103,17 @@ class TranslationCatalog:
         missing = ref_keys - cur_keys
         return len(missing) == 0, missing
 
-    def validate(self) -> List[str]:
-        """Validate catalog entries for structural and type correctness."""
+    def validate(self, reference: Optional[TranslationCatalog] = None) -> List[str]:
+        """
+        Validate catalog entries for structural and type correctness.
+        If a reference catalog is provided, also validates placeholder compatibility.
+        """
         from .loader import LanguageCatalogLoader
+        errors: List[str] = []
         is_valid, err = LanguageCatalogLoader.validate_catalog_dict(self.to_dict())
         if not is_valid and err:
-            return [err]
-        return []
+            errors.append(err)
+        if reference is not None:
+            mismatches = LanguageCatalogLoader.validate_placeholder_compatibility(self, reference)
+            errors.extend(mismatches)
+        return errors

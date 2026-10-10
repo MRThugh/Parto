@@ -56,9 +56,9 @@ class FilterDialog(QDialog):
         left_layout = QVBoxLayout()
         left_layout.setSpacing(8)
 
-        list_label = QLabel(t("dialog.filter.subtitle", default="Available Filters:"), self)
-        list_label.setStyleSheet("font-weight: 600; font-size: 12px;")
-        left_layout.addWidget(list_label)
+        self.list_label = QLabel(t("dialog.filter.subtitle", default="Available Filters:"), self)
+        self.list_label.setStyleSheet("font-weight: 600; font-size: 12px;")
+        left_layout.addWidget(self.list_label)
 
         self.filter_list = QListWidget(self)
         for f_id in SUPPORTED_FILTERS:
@@ -100,18 +100,36 @@ class FilterDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(10)
 
-        cancel_btn = QPushButton(t("dialog.common.cancel", default="Cancel"), self)
-        cancel_btn.clicked.connect(self.reject)
-        btn_layout.addWidget(cancel_btn)
+        self.cancel_btn = QPushButton(t("dialog.common.cancel", default="Cancel"), self)
+        self.cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(self.cancel_btn)
 
-        apply_btn = QPushButton(t("dialog.common.apply", default="Apply Filter"), self)
-        apply_btn.setObjectName("PrimaryAction")
-        apply_btn.clicked.connect(self.accept)
-        btn_layout.addWidget(apply_btn)
+        self.apply_btn = QPushButton(t("dialog.common.apply", default="Apply Filter"), self)
+        self.apply_btn.setObjectName("PrimaryAction")
+        self.apply_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(self.apply_btn)
 
         right_layout.addLayout(btn_layout)
 
         layout.addLayout(right_layout, stretch=2)
+
+    def retranslate_ui(self):
+        """Update texts when language changes."""
+        self.setWindowTitle(t("dialog.filter.title", default="Filter Gallery"))
+        if hasattr(self, "list_label"):
+            self.list_label.setText(t("dialog.filter.subtitle", default="Available Filters:"))
+        if hasattr(self, "compare_btn"):
+            self.compare_btn.setText(t("panel.adjustments.compare", default="Hold to View Original"))
+        if hasattr(self, "cancel_btn"):
+            self.cancel_btn.setText(t("dialog.common.cancel", default="Cancel"))
+        if hasattr(self, "apply_btn"):
+            self.apply_btn.setText(t("dialog.common.apply", default="Apply Filter"))
+        if hasattr(self, "filter_list"):
+            for idx in range(self.filter_list.count()):
+                item = self.filter_list.item(idx)
+                f_id = item.data(Qt.UserRole)
+                if f_id:
+                    item.setText(t(f"filter.{f_id}", default=f_id.replace("_", " ").title()))
 
     def _on_filter_selection_changed(self, current: Optional[QListWidgetItem], _: Optional[QListWidgetItem]):
         if current:

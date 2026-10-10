@@ -24,6 +24,8 @@ from .models import (
     TextDirection,
     DiagnosticRecord,
     is_valid_locale_id,
+    canonicalize_locale_id,
+    DuplicateCatalogError,
 )
 from .catalog import TranslationCatalog
 from .loader import LanguageCatalogLoader
@@ -209,33 +211,118 @@ class LocalizationManager(_BaseEmitter):
         return sorted(list(self._catalogs.keys()))
 
     def get_catalog(self, locale_id: str) -> Optional[TranslationCatalog]:
-        """Access registered catalog for given language code."""
-        return self._catalogs.get(locale_id)
+        """Access registered catalog for given language code with normalization and case fallback."""
+        if not locale_id or not isinstance(locale_id, str):
+            return None
+        clean_id = locale_id.strip()
+        if clean_id in self._catalogs:
+            return self._catalogs[clean_id]
+        if is_valid_locale_id(clean_id):
+            canon_id = canonicalize_locale_id(clean_id)
+            if canon_id in self._catalogs:
+                return self._catalogs[canon_id]
+        lower_tag = clean_id.lower().replace("_", "-")
+        for k, cat in self._catalogs.items():
+            if k.lower().replace("_", "-") == lower_tag:
+                return cat
+        return None
 
     # -------------------------------------------------------------------------
     # Catalog Registration & Discovery
     # -------------------------------------------------------------------------
 
-    def register_catalog(self, catalog: TranslationCatalog) -> bool:
-        """Register a valid TranslationCatalog into the manager."""
-        errors = catalog.validate()
-        if errors:
-            msg = f"Rejected catalog '{catalog.id}': {'; '.join(errors)}"
-            self._record_diagnostic("error", msg, locale_id=catalog.id)
+    def register_catalog(self, catalog: TranslationCatalog, replace: bool = False) -> bool:
+        """
+        Register a valid TranslationCatalog into the manager.
+        
+        Duplicate Registration Policy:
+        - Accidental duplicate registrations are strictly rejected with a clear diagnostic error and return False.
+        - Replacing an existing catalog requires an explicit `replace=True` flag.
+        - Normalizes locale identifiers before duplicate detection so case variations are caught.
+        - Enforces placeholder compatibility against the configured fallback catalog.
+        """
+        if not catalog or not hasattr(catalog, "id"):
+            self._record_diagnostic("error", "Rejected invalid catalog object")
+            return False
+
+        raw_id = catalog.id
+        if not is_valid_locale_id(raw_id):
+            msg = f"Rejected catalog with invalid locale identifier: {raw_id!r}"
+            self._record_diagnostic("error", msg, locale_id=str(raw_id))
             logger.warning(msg)
             return False
 
-        self._catalogs[catalog.id] = catalog
-        logger.info(f"Registered language catalog: {catalog.id} ({catalog.name}) with {catalog.count()} keys")
+        canon_id = canonicalize_locale_id(raw_id)
+
+        # Check for existing duplicate registrations across canonical and case variants
+        existing_key = None
+        if canon_id in self._catalogs:
+            existing_key = canon_id
+        else:
+            lower_norm = canon_id.lower()
+            for k in self._catalogs.keys():
+                if k.lower() == lower_norm:
+                    existing_key = k
+                    break
+
+        if existing_key is not None and not replace:
+            msg = (
+                f"Duplicate catalog registration rejected for locale '{canon_id}' "
+                f"(already registered as '{existing_key}'). Pass replace=True to overwrite."
+            )
+            self._record_diagnostic("error", msg, locale_id=canon_id)
+            logger.warning(msg)
+            return False
+
+        # Structural & Schema Validation
+        errors = catalog.validate()
+        if errors:
+            msg = f"Rejected catalog '{canon_id}': {'; '.join(errors)}"
+            self._record_diagnostic("error", msg, locale_id=canon_id)
+            logger.warning(msg)
+            return False
+
+        # Placeholder Compatibility Validation against fallback catalog
+        fb_key = canonicalize_locale_id(self._fallback_locale) if is_valid_locale_id(self._fallback_locale) else self._fallback_locale
+        if canon_id != fb_key and fb_key in self._catalogs:
+            fb_cat = self._catalogs[fb_key]
+            mismatches = LanguageCatalogLoader.validate_placeholder_compatibility(catalog, fb_cat)
+            if mismatches:
+                msg = (
+                    f"Rejected catalog '{canon_id}' due to placeholder incompatibility with fallback '{fb_key}': "
+                    f"{'; '.join(mismatches)}"
+                )
+                self._record_diagnostic("error", msg, locale_id=canon_id)
+                logger.warning(msg)
+                return False
+
+        # If we are registering or replacing the fallback catalog, check existing catalogs for compatibility
+        if canon_id == fb_key:
+            for exist_id, exist_cat in list(self._catalogs.items()):
+                if exist_id != canon_id:
+                    mismatches = LanguageCatalogLoader.validate_placeholder_compatibility(exist_cat, catalog)
+                    if mismatches:
+                        msg = (
+                            f"Warning: Existing catalog '{exist_id}' has placeholder incompatibility with newly registered fallback '{canon_id}': "
+                            f"{'; '.join(mismatches)}"
+                        )
+                        self._record_diagnostic("warning", msg, locale_id=exist_id)
+                        logger.warning(msg)
+
+        if existing_key is not None and existing_key != canon_id:
+            del self._catalogs[existing_key]
+
+        self._catalogs[canon_id] = catalog
+        logger.info(f"Registered language catalog: {canon_id} ({catalog.name}) with {catalog.count()} keys (replace={replace})")
         return True
 
-    def load_catalog_file(self, filepath: str) -> bool:
+    def load_catalog_file(self, filepath: str, replace: bool = False) -> bool:
         """Load and register a single catalog file."""
         cat, err = LanguageCatalogLoader.load_from_file(filepath)
         if not cat:
             self._record_diagnostic("error", f"Failed to load '{filepath}': {err}")
             return False
-        return self.register_catalog(cat)
+        return self.register_catalog(cat, replace=replace)
 
     def discover_locales(self, directory: Optional[str] = None) -> int:
         """
@@ -254,7 +341,7 @@ class LocalizationManager(_BaseEmitter):
         discovered = LanguageCatalogLoader.discover_catalogs(dirs)
         added = 0
         for cat in discovered.values():
-            if self.register_catalog(cat):
+            if self.register_catalog(cat, replace=False):
                 added += 1
         return added
 
@@ -340,7 +427,7 @@ class LocalizationManager(_BaseEmitter):
         target_locale: str,
         key: str,
         default: Optional[str],
-        count: Optional[int],
+        count: Optional[Any],
         params: Dict[str, Any],
     ) -> str:
         if not key or not isinstance(key, str):
@@ -349,18 +436,20 @@ class LocalizationManager(_BaseEmitter):
         entry = None
         effective_locale = target_locale
 
-        # 1. Look up in target catalog
-        target_cat = self._catalogs.get(target_locale)
+        # 1. Look up in target catalog with normalization
+        target_cat = self.get_catalog(target_locale)
         if target_cat:
             entry = target_cat.get(key)
+            effective_locale = target_cat.id
 
         # 2. Look up in fallback catalog if missing in target
-        if entry is None and target_locale != self._fallback_locale:
-            fb_cat = self._catalogs.get(self._fallback_locale)
+        fb_locale = self._fallback_locale
+        if entry is None and (target_cat is None or target_cat.id != fb_locale):
+            fb_cat = self.get_catalog(fb_locale)
             if fb_cat:
                 entry = fb_cat.get(key)
                 if entry is not None:
-                    effective_locale = self._fallback_locale
+                    effective_locale = fb_cat.id
                     self._record_missing_key(key, target_locale)
 
         # 3. Neither catalog provides an entry
@@ -424,34 +513,39 @@ class LocalizationManager(_BaseEmitter):
             self._record_diagnostic("error", f"Invalid locale identifier requested: {locale_id!r}", locale_id=str(locale_id))
             return False
 
-        target_id = locale_id.strip()
+        raw_id = locale_id.strip()
 
-        if not is_valid_locale_id(target_id):
-            msg = f"Invalid or malformed locale identifier format: {target_id!r}"
-            self._record_diagnostic("error", msg, locale_id=target_id)
+        if not is_valid_locale_id(raw_id):
+            msg = f"Invalid or malformed locale identifier format: {raw_id!r}"
+            self._record_diagnostic("error", msg, locale_id=raw_id)
             logger.warning(msg)
             return False
 
+        canon_target = canonicalize_locale_id(raw_id)
+
         # No-op if already active
+        if raw_id == self._current_locale or canon_target == self._current_locale:
+            return True
+
+        # Resolve candidate catalog
+        new_catalog = self.get_catalog(canon_target)
+        if new_catalog is None:
+            if self._discovery_directories:
+                for disc_dir in self._discovery_directories:
+                    self.discover_locales(disc_dir)
+                new_catalog = self.get_catalog(canon_target)
+
+        # Validate target catalog existence
+        if new_catalog is None:
+            msg = f"Requested locale '{canon_target}' is not available in registered catalogs."
+            self._record_diagnostic("error", msg, locale_id=canon_target)
+            logger.warning(msg)
+            return False
+
+        target_id = new_catalog.id
         if target_id == self._current_locale:
             return True
 
-        # If not yet registered, attempt discovery across registered directories
-        if target_id not in self._catalogs:
-            if self._discovery_directories:
-                discovered = LanguageCatalogLoader.discover_catalogs(self._discovery_directories)
-                for cat in discovered.values():
-                    if cat.id not in self._catalogs:
-                        self.register_catalog(cat)
-
-        # Validate target catalog existence
-        if target_id not in self._catalogs:
-            msg = f"Requested locale '{target_id}' is not available in registered catalogs."
-            self._record_diagnostic("error", msg, locale_id=target_id)
-            logger.warning(msg)
-            return False
-
-        new_catalog = self._catalogs[target_id]
         validation_errors = new_catalog.validate()
         if validation_errors:
             msg = f"Candidate catalog '{target_id}' failed validation: {'; '.join(validation_errors)}"

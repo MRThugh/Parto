@@ -17,6 +17,7 @@ from .models import (
     CATALOG_SCHEMA_VERSION,
     SUPPORTED_SCHEMA_VERSIONS,
     is_valid_locale_id,
+    canonicalize_locale_id,
 )
 from .catalog import TranslationCatalog
 from .formatting import validate_placeholder_syntax, extract_placeholders
@@ -217,13 +218,14 @@ class LanguageCatalogLoader:
                     if os.path.isfile(candidate_file):
                         cat, err = cls.load_from_file(candidate_file)
                         if cat:
-                            if cat.id in discovered:
-                                logger.info(
-                                    f"Deterministic discovery: Ignoring duplicate locale '{cat.id}' "
-                                    f"at '{candidate_file}', keeping previously discovered at '{discovered[cat.id].filepath}'"
+                            norm_id = canonicalize_locale_id(cat.id) if is_valid_locale_id(cat.id) else cat.id
+                            if norm_id in discovered:
+                                logger.warning(
+                                    f"Deterministic discovery: Ignoring duplicate locale '{norm_id}' "
+                                    f"at '{candidate_file}', keeping previously discovered at '{discovered[norm_id].filepath}'"
                                 )
                             else:
-                                discovered[cat.id] = cat
+                                discovered[norm_id] = cat
                         else:
                             logger.warning(f"Skipping malformed catalog '{candidate_file}': {err}")
 
@@ -231,13 +233,14 @@ class LanguageCatalogLoader:
                 elif os.path.isfile(full_path) and entry.lower().endswith(".json") and entry.lower() != "package.json":
                     cat, err = cls.load_from_file(full_path)
                     if cat:
-                        if cat.id in discovered:
-                            logger.info(
-                                f"Deterministic discovery: Ignoring duplicate locale '{cat.id}' "
-                                f"at '{full_path}', keeping previously discovered at '{discovered[cat.id].filepath}'"
+                        norm_id = canonicalize_locale_id(cat.id) if is_valid_locale_id(cat.id) else cat.id
+                        if norm_id in discovered:
+                            logger.warning(
+                                f"Deterministic discovery: Ignoring duplicate locale '{norm_id}' "
+                                f"at '{full_path}', keeping previously discovered at '{discovered[norm_id].filepath}'"
                             )
                         else:
-                            discovered[cat.id] = cat
+                            discovered[norm_id] = cat
                     else:
                         logger.warning(f"Skipping malformed catalog '{full_path}': {err}")
 
@@ -251,7 +254,7 @@ class LanguageCatalogLoader:
     ) -> List[str]:
         """
         Verify named interpolation placeholders in candidate catalog match fallback catalog.
-        Returns list of mismatch error descriptions.
+        Returns list of mismatch error descriptions identifying the locale, key, and mismatch nature.
         """
         mismatches: List[str] = []
         for key in candidate.keys():
@@ -279,9 +282,16 @@ class LanguageCatalogLoader:
                         fall_placeholders.update(extract_placeholders(p_str))
 
             if cand_placeholders != fall_placeholders:
+                missing_in_cand = fall_placeholders - cand_placeholders
+                extra_in_cand = cand_placeholders - fall_placeholders
+                details = []
+                if missing_in_cand:
+                    details.append(f"missing in candidate: {sorted(missing_in_cand)}")
+                if extra_in_cand:
+                    details.append(f"extra in candidate: {sorted(extra_in_cand)}")
+                diff_str = "; ".join(details) if details else f"candidate={sorted(cand_placeholders)}, fallback={sorted(fall_placeholders)}"
                 mismatches.append(
-                    f"Key '{key}' placeholder mismatch: candidate has {sorted(cand_placeholders)}, "
-                    f"fallback has {sorted(fall_placeholders)}"
+                    f"Key '{key}' placeholder mismatch in locale '{candidate.id}': {diff_str} (fallback '{fallback.id}')"
                 )
 
         return mismatches

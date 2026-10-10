@@ -3,3 +3,4 @@ Pillow>=9.5.0
 pytest>=7.0.0
 pillow-heif>=0.10.0
 numpy>=1.24.0
+Babel>=2.10.0

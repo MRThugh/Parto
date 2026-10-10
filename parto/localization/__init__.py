@@ -14,9 +14,12 @@ from .models import (
     CatalogError,
     CatalogNotFoundError,
     CatalogValidationError,
+    DuplicateCatalogError,
     InvalidLocaleIdentifierError,
     LocaleSwitchError,
     is_valid_locale_id,
+    canonicalize_locale_id,
+    normalize_locale_id,
 )
 from .catalog import TranslationCatalog
 from .loader import LanguageCatalogLoader
@@ -34,6 +37,12 @@ from .manager import (
     t,
 )
 
+from .validator import (
+    scan_codebase_translation_keys,
+    validate_catalog_parity,
+    validate_codebase_key_coverage,
+)
+
 __all__ = [
     "LocaleMetadata",
     "TextDirection",
@@ -44,9 +53,12 @@ __all__ = [
     "CatalogError",
     "CatalogNotFoundError",
     "CatalogValidationError",
+    "DuplicateCatalogError",
     "InvalidLocaleIdentifierError",
     "LocaleSwitchError",
     "is_valid_locale_id",
+    "canonicalize_locale_id",
+    "normalize_locale_id",
     "TranslationCatalog",
     "LanguageCatalogLoader",
     "safe_interpolate",
@@ -58,4 +70,8 @@ __all__ = [
     "LocalizationManager",
     "get_localization_manager",
     "t",
+    "scan_codebase_translation_keys",
+    "validate_catalog_parity",
+    "validate_codebase_key_coverage",
 ]
+
