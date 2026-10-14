@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
 )
 from parto.themes.manager import get_theme_manager
+from parto.localization import t
 
 
 class BrushPreviewWidget(QWidget):
@@ -39,12 +40,15 @@ class BrushPreviewWidget(QWidget):
         self.setObjectName("BrushPreviewWidget")
         self.setFixedSize(30, 30)
         self.setCursor(Qt.PointingHandCursor)
-        self.setToolTip("Real-time Brush Dab Preview (Click to choose color)")
+        self.setToolTip(t("brush.bar.preview_tip", default="Real-time Brush Dab Preview (Click to choose color)"))
 
         self._size: int = 8
         self._hardness: float = 0.8
         self._opacity: float = 1.0
         self._color: Tuple[int, int, int, int] = (0, 0, 0, 255)
+
+    def retranslate_ui(self) -> None:
+        self.setToolTip(t("brush.bar.preview_tip", default="Real-time Brush Dab Preview (Click to choose color)"))
 
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.LeftButton:

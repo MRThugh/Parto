@@ -22,6 +22,9 @@ from .widgets.slider import LabeledSliderSpinRow
 from .widgets.section import CollapsibleSection
 
 
+from parto.localization import t
+
+
 BLEND_MODES: List[str] = [
     "Normal",
     "Multiply",
@@ -46,33 +49,33 @@ class BrushBlendSection(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
 
-        self.section = CollapsibleSection("Blend & Rendering", collapsed=False, parent=self)
+        self.section = CollapsibleSection(t("brush.studio.blend_title", default="Blend & Rendering"), collapsed=False, parent=self)
         layout.addWidget(self.section)
 
         # 1. Blend Mode Dropdown
         mode_row = QHBoxLayout()
         mode_row.setSpacing(8)
 
-        lbl_mode = QLabel("Blend Mode:", self)
-        lbl_mode.setFixedWidth(70)
-        lbl_mode.setStyleSheet("font-size: 11px; font-weight: 500;")
-        mode_row.addWidget(lbl_mode)
+        self.lbl_mode = QLabel(t("brush.blend.mode", default="Blend Mode:"), self)
+        self.lbl_mode.setFixedWidth(70)
+        self.lbl_mode.setStyleSheet("font-size: 11px; font-weight: 500;")
+        mode_row.addWidget(self.lbl_mode)
 
         self.combo_mode = QComboBox(self)
         self.combo_mode.addItems(BLEND_MODES)
-        self.combo_mode.setToolTip("Photometric blending calculation for brush dabs on the active layer")
+        self.combo_mode.setToolTip(t("brush.blend.mode_tip", default="Photometric blending calculation for brush dabs on the active layer"))
         self.combo_mode.currentTextChanged.connect(self._on_mode_changed)
         mode_row.addWidget(self.combo_mode)
         self.section.add_layout(mode_row)
 
         # 2. Opacity Slider & Spin (1 to 100 %)
         self.row_opacity = LabeledSliderSpinRow(
-            label="Opacity:",
+            label=t("brush.bar.opacity", default="Opacity:"),
             min_val=1,
             max_val=100,
             suffix=" %",
             default_val=int(round(self.settings.opacity * 100)),
-            tooltip="Maximum opacity limit for the stroke (Keys 1-9, 0)",
+            tooltip=t("brush.blend.opacity_tip", default="Maximum opacity limit for the stroke (Keys 1-9, 0)"),
             parent=self,
         )
         self.row_opacity.valueChanged.connect(self._on_opacity_changed)
@@ -80,20 +83,20 @@ class BrushBlendSection(QWidget):
 
         # 3. Flow Slider & Spin (1 to 100 %)
         self.row_flow = LabeledSliderSpinRow(
-            label="Flow:",
+            label=t("brush.studio.flow", default="Flow:"),
             min_val=1,
             max_val=100,
             suffix=" %",
             default_val=int(round(self.settings.flow * 100)),
-            tooltip="Rate at which paint deposits per stamped dab",
+            tooltip=t("brush.blend.flow_tip", default="Rate at which paint deposits per stamped dab"),
             parent=self,
         )
         self.row_flow.valueChanged.connect(self._on_flow_changed)
         self.section.add_widget(self.row_flow)
 
         # 4. Erase Mode Checkbox
-        self.cb_eraser = QCheckBox("Erase Mode (Alpha Eraser)", self)
-        self.cb_eraser.setToolTip("When checked, stroke removes layer opacity instead of depositing pigment (Shift+B)")
+        self.cb_eraser = QCheckBox(t("brush.studio.erase_mode", default="Erase Mode (Alpha Eraser)"), self)
+        self.cb_eraser.setToolTip(t("brush.blend.eraser_tip", default="When checked, stroke removes layer opacity instead of depositing pigment (Shift+B)"))
         self.cb_eraser.setChecked(self.settings.is_eraser)
         self.cb_eraser.toggled.connect(self._on_eraser_toggled)
         self.section.add_widget(self.cb_eraser)

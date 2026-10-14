@@ -14,6 +14,9 @@ from .widgets.slider import LabeledSliderSpinRow
 from .widgets.section import CollapsibleSection
 
 
+from parto.localization import t
+
+
 class BrushTipPropertiesSection(QWidget):
     """
     Precision controls for brush geometry and tip stamping behavior.
@@ -28,17 +31,17 @@ class BrushTipPropertiesSection(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
 
-        self.section = CollapsibleSection("Brush Tip", collapsed=False, parent=self)
+        self.section = CollapsibleSection(t("brush.studio.tip_title", default="Brush Tip"), collapsed=False, parent=self)
         layout.addWidget(self.section)
 
         # Size: 1 to 500 px
         self.row_size = LabeledSliderSpinRow(
-            label="Size:",
+            label=t("brush.bar.size", default="Size:"),
             min_val=1,
             max_val=500,
             suffix=" px",
             default_val=self.settings.size,
-            tooltip="Brush tip diameter in pixels ([ and ] shortcuts)",
+            tooltip=t("brush.properties.size_tip", default="Brush tip diameter in pixels ([ and ] shortcuts)"),
             parent=self,
         )
         self.row_size.valueChanged.connect(self._on_size_changed)
@@ -46,12 +49,12 @@ class BrushTipPropertiesSection(QWidget):
 
         # Hardness: 0 to 100 %
         self.row_hardness = LabeledSliderSpinRow(
-            label="Hardness:",
+            label=t("brush.bar.hardness", default="Hardness:"),
             min_val=0,
             max_val=100,
             suffix=" %",
             default_val=int(round(self.settings.hardness * 100)),
-            tooltip="Edge sharpness vs radial feathering falloff (Ctrl+[ and Ctrl+] shortcuts)",
+            tooltip=t("brush.properties.hardness_tip", default="Edge sharpness vs radial feathering falloff (Ctrl+[ and Ctrl+] shortcuts)"),
             parent=self,
         )
         self.row_hardness.valueChanged.connect(self._on_hardness_changed)
@@ -59,12 +62,12 @@ class BrushTipPropertiesSection(QWidget):
 
         # Spacing: 5 to 200 %
         self.row_spacing = LabeledSliderSpinRow(
-            label="Spacing:",
+            label=t("brush.studio.spacing", default="Spacing:"),
             min_val=5,
             max_val=200,
             suffix=" %",
             default_val=int(round(self.settings.spacing * 100)),
-            tooltip="Distance between consecutive stamped dabs relative to brush radius",
+            tooltip=t("brush.properties.spacing_tip", default="Distance between consecutive stamped dabs relative to brush radius"),
             parent=self,
         )
         self.row_spacing.valueChanged.connect(self._on_spacing_changed)
@@ -72,12 +75,12 @@ class BrushTipPropertiesSection(QWidget):
 
         # Angle: 0 to 360 °
         self.row_angle = LabeledSliderSpinRow(
-            label="Angle:",
+            label=t("brush.studio.angle", default="Angle:"),
             min_val=0,
             max_val=360,
             suffix="°",
             default_val=int(round(getattr(self.settings, "angle", 0.0))),
-            tooltip="Brush tip rotation in degrees",
+            tooltip=t("brush.properties.angle_tip", default="Brush tip rotation in degrees"),
             parent=self,
         )
         self.row_angle.valueChanged.connect(self._on_angle_changed)
@@ -85,12 +88,12 @@ class BrushTipPropertiesSection(QWidget):
 
         # Roundness: 1 to 100 %
         self.row_roundness = LabeledSliderSpinRow(
-            label="Roundness:",
+            label=t("brush.studio.roundness", default="Roundness:"),
             min_val=1,
             max_val=100,
             suffix=" %",
             default_val=int(round(getattr(self.settings, "roundness", 1.0) * 100)),
-            tooltip="Aspect ratio of brush tip ellipse (100% is circular, lower is flat/chisel)",
+            tooltip=t("brush.properties.roundness_tip", default="Aspect ratio of brush tip ellipse (100% is circular, lower is flat/chisel)"),
             parent=self,
         )
         self.row_roundness.valueChanged.connect(self._on_roundness_changed)
@@ -148,8 +151,23 @@ class BrushTipPropertiesSection(QWidget):
         """Update section title and row labels with active language."""
         from parto.localization import t
         self.section.set_title(t("brush.studio.tip_title", default="Brush Tip"))
-        self.row_size.label.setText(t("brush.bar.size", default="Size:"))
-        self.row_hardness.label.setText(t("brush.bar.hardness", default="Hardness:"))
-        self.row_spacing.label.setText(t("brush.studio.spacing", default="Spacing:"))
-        self.row_angle.label.setText(t("brush.studio.angle", default="Angle:"))
-        self.row_roundness.label.setText(t("brush.studio.roundness", default="Roundness:"))
+        self.row_size.update_text(
+            t("brush.bar.size", default="Size:"),
+            t("brush.properties.size_tip", default="Brush tip diameter in pixels ([ and ] shortcuts)"),
+        )
+        self.row_hardness.update_text(
+            t("brush.bar.hardness", default="Hardness:"),
+            t("brush.properties.hardness_tip", default="Edge sharpness vs radial feathering falloff (Ctrl+[ and Ctrl+] shortcuts)"),
+        )
+        self.row_spacing.update_text(
+            t("brush.studio.spacing", default="Spacing:"),
+            t("brush.properties.spacing_tip", default="Distance between consecutive stamped dabs relative to brush radius"),
+        )
+        self.row_angle.update_text(
+            t("brush.studio.angle", default="Angle:"),
+            t("brush.properties.angle_tip", default="Brush tip rotation in degrees"),
+        )
+        self.row_roundness.update_text(
+            t("brush.studio.roundness", default="Roundness:"),
+            t("brush.properties.roundness_tip", default="Aspect ratio of brush tip ellipse (100% is circular, lower is flat/chisel)"),
+        )

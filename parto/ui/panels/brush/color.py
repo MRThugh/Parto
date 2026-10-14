@@ -24,6 +24,9 @@ from .widgets.section import CollapsibleSection
 from parto.themes.manager import get_theme_manager
 
 
+from parto.localization import t
+
+
 PALETTE_SWATCHES = [
     ("#000000", "Black"),
     ("#ffffff", "White"),
@@ -64,42 +67,42 @@ class BrushColorSection(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
 
-        self.section = CollapsibleSection("Color", collapsed=False, parent=self)
+        self.section = CollapsibleSection(t("brush.studio.color_title", default="Color"), collapsed=False, parent=self)
         layout.addWidget(self.section)
 
         # 1. Dual chips row: FG, BG, Swap (X), Default (D)
         chips_row = QHBoxLayout()
         chips_row.setSpacing(8)
 
-        lbl_fg = QLabel("FG:", self)
-        lbl_fg.setStyleSheet("font-size: 11px; font-weight: 500;")
-        chips_row.addWidget(lbl_fg)
+        self.lbl_fg = QLabel(t("brush.color.fg", default="FG:"), self)
+        self.lbl_fg.setStyleSheet("font-size: 11px; font-weight: 500;")
+        chips_row.addWidget(self.lbl_fg)
 
         self.chip_fg = ColorChipButton(self)
-        self.chip_fg.setToolTip("Foreground Color (Click to select)")
+        self.chip_fg.setToolTip(t("brush.color.fg_tip", default="Foreground Color (Click to select)"))
         self.chip_fg.clicked.connect(self._choose_fg_color)
         chips_row.addWidget(self.chip_fg)
 
-        lbl_bg = QLabel("BG:", self)
-        lbl_bg.setStyleSheet("font-size: 11px; font-weight: 500;")
-        chips_row.addWidget(lbl_bg)
+        self.lbl_bg = QLabel(t("brush.color.bg", default="BG:"), self)
+        self.lbl_bg.setStyleSheet("font-size: 11px; font-weight: 500;")
+        chips_row.addWidget(self.lbl_bg)
 
         self.chip_bg = ColorChipButton(self)
-        self.chip_bg.setToolTip("Background Color (Click to select)")
+        self.chip_bg.setToolTip(t("brush.color.bg_tip", default="Background Color (Click to select)"))
         self.chip_bg.clicked.connect(self._choose_bg_color)
         chips_row.addWidget(self.chip_bg)
 
         self.btn_swap = QToolButton(self)
         self.btn_swap.setText("⇄")
         self.btn_swap.setFixedSize(24, 24)
-        self.btn_swap.setToolTip("Swap Foreground and Background (X)")
+        self.btn_swap.setToolTip(t("brush.bar.swap_colors", default="Swap Foreground and Background (X)"))
         self.btn_swap.clicked.connect(self._on_swap_colors)
         chips_row.addWidget(self.btn_swap)
 
         self.btn_reset = QToolButton(self)
         self.btn_reset.setText("D")
         self.btn_reset.setFixedSize(24, 24)
-        self.btn_reset.setToolTip("Reset to Default Black & White (D)")
+        self.btn_reset.setToolTip(t("brush.bar.reset_colors", default="Reset to Default Black & White (D)"))
         self.btn_reset.clicked.connect(self._on_reset_colors)
         chips_row.addWidget(self.btn_reset)
 
@@ -122,9 +125,9 @@ class BrushColorSection(QWidget):
 
         # 3. Recent Colors Row
         recent_label_row = QHBoxLayout()
-        lbl_recent = QLabel("Recent Colors:", self)
-        lbl_recent.setStyleSheet("font-size: 10px; opacity: 0.75;")
-        recent_label_row.addWidget(lbl_recent)
+        self.lbl_recent = QLabel(t("brush.color.recent", default="Recent Colors:"), self)
+        self.lbl_recent.setStyleSheet("font-size: 10px; opacity: 0.75;")
+        recent_label_row.addWidget(self.lbl_recent)
         recent_label_row.addStretch()
         self.section.add_layout(recent_label_row)
 
@@ -144,7 +147,7 @@ class BrushColorSection(QWidget):
     def _choose_fg_color(self) -> None:
         r, g, b, a = self.settings.color
         col = QColorDialog.getColor(
-            QColor(r, g, b, a), self, "Select Foreground Color", QColorDialog.ShowAlphaChannel
+            QColor(r, g, b, a), self, t("brush.color.select_fg", default="Select Foreground Color"), QColorDialog.ShowAlphaChannel
         )
         if col.isValid():
             rgba = (col.red(), col.green(), col.blue(), col.alpha())
@@ -156,7 +159,7 @@ class BrushColorSection(QWidget):
     def _choose_bg_color(self) -> None:
         r, g, b, a = self.settings.background_color
         col = QColorDialog.getColor(
-            QColor(r, g, b, a), self, "Select Background Color", QColorDialog.ShowAlphaChannel
+            QColor(r, g, b, a), self, t("brush.color.select_bg", default="Select Background Color"), QColorDialog.ShowAlphaChannel
         )
         if col.isValid():
             rgba = (col.red(), col.green(), col.blue(), col.alpha())
@@ -215,8 +218,20 @@ class BrushColorSection(QWidget):
         self.color_changed.emit(rgba)
 
     def retranslate_ui(self) -> None:
-        """Update color section header and button tooltips with active language."""
+        """Update color section header, labels, and button tooltips with active language."""
         from parto.localization import t
         self.section.set_title(t("brush.studio.color_title", default="Color"))
-        self.btn_swap.setToolTip(t("brush.bar.swap_colors", default="Swap Foreground and Background (X)"))
-        self.btn_reset.setToolTip(t("brush.bar.reset_colors", default="Reset to Default Black / White (D)"))
+        if hasattr(self, "lbl_fg"):
+            self.lbl_fg.setText(t("brush.color.fg", default="FG:"))
+        if hasattr(self, "chip_fg"):
+            self.chip_fg.setToolTip(t("brush.color.fg_tip", default="Foreground Color (Click to select)"))
+        if hasattr(self, "lbl_bg"):
+            self.lbl_bg.setText(t("brush.color.bg", default="BG:"))
+        if hasattr(self, "chip_bg"):
+            self.chip_bg.setToolTip(t("brush.color.bg_tip", default="Background Color (Click to select)"))
+        if hasattr(self, "btn_swap"):
+            self.btn_swap.setToolTip(t("brush.bar.swap_colors", default="Swap Foreground and Background (X)"))
+        if hasattr(self, "btn_reset"):
+            self.btn_reset.setToolTip(t("brush.bar.reset_colors", default="Reset to Default Black & White (D)"))
+        if hasattr(self, "lbl_recent"):
+            self.lbl_recent.setText(t("brush.color.recent", default="Recent Colors:"))

@@ -23,6 +23,7 @@ from parto.brush.models.settings import BrushSettings
 from parto.brush.presets.preset_manager import BrushPresetManager
 from .widgets.brush_preview import StudioBrushPreviewWidget
 from parto.themes.manager import get_theme_manager
+from parto.localization import t
 
 
 class BrushStudioHeader(QFrame):
@@ -62,11 +63,21 @@ class BrushStudioHeader(QFrame):
         text_layout.setSpacing(2)
         text_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.lbl_name = QLabel("Basic Round", self)
+        self.lbl_name = QLabel(t("brush.preset_basic_round", default="Basic Round"), self)
         self.lbl_name.setStyleSheet("font-weight: 700; font-size: 13px;")
         text_layout.addWidget(self.lbl_name)
 
-        self.lbl_summary = QLabel("12 px • 100% Opacity • 80% Hardness", self)
+        self.lbl_summary = QLabel(
+            t(
+                "brush.header.summary",
+                size=12,
+                opacity=100,
+                hardness=80,
+                angle="",
+                default="12 px • 100% Opacity • 80% Hardness",
+            ),
+            self,
+        )
         self.lbl_summary.setStyleSheet("font-size: 11px; opacity: 0.85;")
         text_layout.addWidget(self.lbl_summary)
 
@@ -80,7 +91,7 @@ class BrushStudioHeader(QFrame):
         # Reset button
         self.btn_reset = QToolButton(self)
         self.btn_reset.setText("↺")
-        self.btn_reset.setToolTip("Reset Brush to Preset Defaults (Shift+F9)")
+        self.btn_reset.setToolTip(t("brush.reset_desc", default="Reset Brush to Preset Defaults (Shift+F9)"))
         self.btn_reset.setFixedSize(26, 26)
         self.btn_reset.clicked.connect(self.reset_preset_clicked.emit)
         btn_layout.addWidget(self.btn_reset)
@@ -88,7 +99,7 @@ class BrushStudioHeader(QFrame):
         # Save Preset (+) button
         self.btn_save = QToolButton(self)
         self.btn_save.setText("+")
-        self.btn_save.setToolTip("Save Current Settings as New Preset")
+        self.btn_save.setToolTip(t("brush.header.save_preset_tip", default="Save Current Settings as New Preset"))
         self.btn_save.setFixedSize(26, 26)
         self.btn_save.clicked.connect(self.save_preset_clicked.emit)
         btn_layout.addWidget(self.btn_save)
@@ -96,7 +107,7 @@ class BrushStudioHeader(QFrame):
         # More menu (⋮)
         self.btn_more = QToolButton(self)
         self.btn_more.setText("⋮")
-        self.btn_more.setToolTip("Preset & Brush Options")
+        self.btn_more.setToolTip(t("brush.header.more_options_tip", default="Preset & Brush Options"))
         self.btn_more.setFixedSize(26, 26)
         self.btn_more.setPopupMode(QToolButton.InstantPopup)
         self._init_more_menu()
@@ -107,36 +118,58 @@ class BrushStudioHeader(QFrame):
         get_theme_manager().theme_changed.connect(lambda _: self._apply_styling())
 
     def _init_more_menu(self) -> None:
+        from parto.localization import t
         menu = QMenu(self)
-        act_save = menu.addAction("+ Save as New Preset...")
+        act_save = menu.addAction(t("brush.header.menu_save", default="+ Save as New Preset..."))
         act_save.triggered.connect(self.save_preset_clicked.emit)
 
-        act_dup = menu.addAction("Duplicate Current Preset (Ctrl+D)")
+        act_dup = menu.addAction(t("brush.header.menu_duplicate", default="Duplicate Current Preset (Ctrl+D)"))
         act_dup.triggered.connect(self.duplicate_preset_clicked.emit)
 
         menu.addSeparator()
-        act_reset = menu.addAction("Reset Brush to Defaults (Shift+F9)")
+        act_reset = menu.addAction(t("brush.reset_desc", default="Reset Brush to Defaults (Shift+F9)"))
         act_reset.triggered.connect(self.reset_preset_clicked.emit)
 
         menu.addSeparator()
-        act_export = menu.addAction("Export Active Preset...")
+        act_export = menu.addAction(t("brush.header.menu_export", default="Export Active Preset..."))
         act_export.triggered.connect(self.export_preset_clicked.emit)
 
-        act_import = menu.addAction("Import Preset from File...")
+        act_import = menu.addAction(t("brush.header.menu_import", default="Import Preset from File..."))
         act_import.triggered.connect(self.import_preset_clicked.emit)
 
         self.btn_more.setMenu(menu)
 
+    def retranslate_ui(self) -> None:
+        """Update header tooltips, menus, and text on language change."""
+        from parto.localization import t
+        self.btn_reset.setToolTip(t("brush.reset_desc", default="Reset Brush to Preset Defaults (Shift+F9)"))
+        self.btn_save.setToolTip(t("brush.header.save_preset_tip", default="Save Current Settings as New Preset"))
+        self.btn_more.setToolTip(t("brush.header.more_options_tip", default="Preset & Brush Options"))
+        self._init_more_menu()
+        if hasattr(self.preview, "retranslate_ui"):
+            self.preview.retranslate_ui()
+        self.sync_from_settings()
+
     def sync_from_settings(self) -> None:
+        from parto.localization import t
         s = self.settings
-        p_name = self.preset_manager.active_preset_name or "Custom"
-        mode_tag = " [Eraser]" if s.is_eraser else ""
+        p_name = self.preset_manager.active_preset_name or t("brush.custom", default="Custom")
+        mode_tag = f" [{t('brush.mode.eraser', default='Eraser')}]" if s.is_eraser else ""
         self.lbl_name.setText(f"{p_name}{mode_tag}")
 
         op_pct = int(round(s.opacity * 100))
         hd_pct = int(round(s.hardness * 100))
         angle_str = f" • {int(round(s.angle))}°" if abs(s.angle) > 0.01 else ""
-        self.lbl_summary.setText(f"{s.size} px • {op_pct}% Opacity • {hd_pct}% Hardness{angle_str}")
+        self.lbl_summary.setText(
+            t(
+                "brush.header.summary",
+                size=s.size,
+                opacity=op_pct,
+                hardness=hd_pct,
+                angle=angle_str,
+                default=f"{s.size} px • {op_pct}% Opacity • {hd_pct}% Hardness{angle_str}",
+            )
+        )
 
         self.preview.update_preview(
             size=s.size,

@@ -19,6 +19,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QWidget
 from parto.themes.manager import get_theme_manager
+from parto.localization import t
 
 
 class StudioBrushPreviewWidget(QWidget):
@@ -34,7 +35,7 @@ class StudioBrushPreviewWidget(QWidget):
         self.setObjectName("StudioBrushPreviewWidget")
         self.setFixedSize(54, 54)
         self.setCursor(Qt.PointingHandCursor)
-        self.setToolTip("Brush Tip Preview (Click to select Color)")
+        self.setToolTip(t("brush.preview.tip", default="Brush Tip Preview (Click to select Color)"))
 
         self._size: int = 12
         self._opacity: float = 1.0
@@ -42,6 +43,9 @@ class StudioBrushPreviewWidget(QWidget):
         self._color: Tuple[int, int, int, int] = (0, 0, 0, 255)
         self._angle: float = 0.0
         self._roundness: float = 1.0
+
+    def retranslate_ui(self) -> None:
+        self.setToolTip(t("brush.preview.tip", default="Brush Tip Preview (Click to select Color)"))
 
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.LeftButton:

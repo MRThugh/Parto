@@ -30,6 +30,9 @@ from .blend import BrushBlendSection
 from .advanced import BrushAdvancedSection
 
 
+from parto.localization import t
+
+
 class BrushStudioDock(QDockWidget):
     """
     Authoritative dockable side panel for Brush Studio.
@@ -44,7 +47,7 @@ class BrushStudioDock(QDockWidget):
         preset_manager: Optional[BrushPresetManager] = None,
         parent: Optional[QWidget] = None,
     ):
-        super().__init__("Brush Studio", parent)
+        super().__init__(t("brush.studio", default="Brush Studio"), parent)
         self.setObjectName("BrushDock")
         self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
 
@@ -105,8 +108,8 @@ class BrushStudioDock(QDockWidget):
         layout.addWidget(self.advanced_section)
 
         # 8. Reset to Factory Defaults Button
-        self.btn_reset_defaults = QPushButton("Reset Brush to Factory Defaults", container)
-        self.btn_reset_defaults.setToolTip("Reset all brush parameters to default state (Shift+F9)")
+        self.btn_reset_defaults = QPushButton(t("brush.reset_defaults", default="Reset Brush to Factory Defaults"), container)
+        self.btn_reset_defaults.setToolTip(t("brush.reset_defaults_desc", default="Reset all brush parameters to default state (Shift+F9)"))
         self.btn_reset_defaults.clicked.connect(self.reset_all_to_defaults)
         layout.addWidget(self.btn_reset_defaults)
 
@@ -340,6 +343,7 @@ class BrushStudioDock(QDockWidget):
         self.setWindowTitle(t("brush.studio", default="Brush Studio"))
 
         for section in (
+            getattr(self, "header", None),
             getattr(self, "presets_section", None),
             getattr(self, "properties_section", None),
             getattr(self, "color_section", None),

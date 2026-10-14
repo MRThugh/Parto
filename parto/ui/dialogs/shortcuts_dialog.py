@@ -34,14 +34,14 @@ class KeySequenceInputDialog(QDialog):
 
     def __init__(self, action_name: str, current_key: str, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.setWindowTitle(f"Edit Shortcut — {action_name}")
+        self.setWindowTitle(t("dialog.shortcuts.edit_title", action=action_name, default=f"Edit Shortcut — {action_name}"))
         self.setModal(True)
         self.setFixedWidth(360)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
 
-        lbl = QLabel(f"Press new key combination for:\n<b>{action_name}</b>", self)
+        lbl = QLabel(t("dialog.shortcuts.edit_prompt", action=action_name, default=f"Press new key combination for:\n<b>{action_name}</b>"), self)
         lbl.setWordWrap(True)
         layout.addWidget(lbl)
 
@@ -86,23 +86,23 @@ class ShortcutsDialog(QDialog):
         top_row.setSpacing(8)
 
         self.search_input = QLineEdit(self)
-        self.search_input.setPlaceholderText("Filter shortcuts by action, key, or category...")
+        self.search_input.setPlaceholderText(t("dialog.shortcuts.filter_placeholder", default="Filter shortcuts by action, key, or category..."))
         self.search_input.setClearButtonEnabled(True)
         self.search_input.textChanged.connect(self._populate_table)
         top_row.addWidget(self.search_input, stretch=3)
 
         self.category_combo = QComboBox(self)
-        self.category_combo.addItem("All Categories")
-        self.category_combo.addItem("Brush")
-        self.category_combo.addItem("Tools")
-        self.category_combo.addItem("File")
-        self.category_combo.addItem("Edit")
-        self.category_combo.addItem("View")
-        self.category_combo.addItem("Image")
-        self.category_combo.addItem("Layers")
-        self.category_combo.addItem("Filters")
-        self.category_combo.addItem("App")
-        self.category_combo.currentTextChanged.connect(self._populate_table)
+        self.category_combo.addItem(t("dialog.shortcuts.category_all", default="All Categories"), "")
+        self.category_combo.addItem(t("menu.brush", default="Brush").replace("&", ""), "Brush")
+        self.category_combo.addItem(t("menu.tools", default="Tools").replace("&", ""), "Tools")
+        self.category_combo.addItem(t("menu.file", default="File").replace("&", ""), "File")
+        self.category_combo.addItem(t("menu.edit", default="Edit").replace("&", ""), "Edit")
+        self.category_combo.addItem(t("menu.view", default="View").replace("&", ""), "View")
+        self.category_combo.addItem(t("menu.image", default="Image").replace("&", ""), "Image")
+        self.category_combo.addItem(t("menu.layers", default="Layers").replace("&", ""), "Layers")
+        self.category_combo.addItem(t("menu.filters", default="Filters").replace("&", ""), "Filters")
+        self.category_combo.addItem(t("dialog.shortcuts.category_app", default="App"), "App")
+        self.category_combo.currentIndexChanged.connect(self._populate_table)
         top_row.addWidget(self.category_combo, stretch=2)
 
         layout.addLayout(top_row)
@@ -110,7 +110,12 @@ class ShortcutsDialog(QDialog):
         # Table
         self.table = QTableWidget(self)
         self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["Action", "Shortcut", "Category", "Description"])
+        self.table.setHorizontalHeaderLabels([
+            t("dialog.shortcuts.header_action", default="Action"),
+            t("dialog.shortcuts.header_key", default="Shortcut"),
+            t("dialog.shortcuts.header_category", default="Category"),
+            t("dialog.shortcuts.header_description", default="Description"),
+        ])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
@@ -125,29 +130,29 @@ class ShortcutsDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(8)
 
-        self.btn_edit = QPushButton("Edit Shortcut...", self)
-        self.btn_edit.setToolTip("Customize the selected action's shortcut key combination")
+        self.btn_edit = QPushButton(t("dialog.shortcuts.edit_btn", default="Edit Shortcut..."), self)
+        self.btn_edit.setToolTip(t("dialog.shortcuts.edit_tip", default="Customize the selected action's shortcut key combination"))
         self.btn_edit.clicked.connect(self._on_edit_selected)
         btn_layout.addWidget(self.btn_edit)
 
-        self.btn_clear = QPushButton("Clear", self)
-        self.btn_clear.setToolTip("Remove keyboard shortcut from selected action")
+        self.btn_clear = QPushButton(t("dialog.shortcuts.clear_btn", default="Clear"), self)
+        self.btn_clear.setToolTip(t("dialog.shortcuts.clear_tip", default="Remove keyboard shortcut from selected action"))
         self.btn_clear.clicked.connect(self._on_clear_selected)
         btn_layout.addWidget(self.btn_clear)
 
-        self.btn_reset_action = QPushButton("Reset Action", self)
-        self.btn_reset_action.setToolTip("Reset selected action to factory default shortcut")
+        self.btn_reset_action = QPushButton(t("dialog.shortcuts.reset_action_btn", default="Reset Action"), self)
+        self.btn_reset_action.setToolTip(t("dialog.shortcuts.reset_action_tip", default="Reset selected action to factory default shortcut"))
         self.btn_reset_action.clicked.connect(self._on_reset_selected_action)
         btn_layout.addWidget(self.btn_reset_action)
 
-        self.btn_reset_all = QPushButton("Reset All to Defaults", self)
-        self.btn_reset_all.setToolTip("Restore all application shortcuts to default bindings")
+        self.btn_reset_all = QPushButton(t("dialog.shortcuts.reset_all_btn", default="Reset All to Defaults"), self)
+        self.btn_reset_all.setToolTip(t("dialog.shortcuts.reset_all_tip", default="Restore all application shortcuts to default bindings"))
         self.btn_reset_all.clicked.connect(self._on_reset_all)
         btn_layout.addWidget(self.btn_reset_all)
 
         btn_layout.addStretch()
 
-        close_btn = QPushButton("Close", self)
+        close_btn = QPushButton(t("dialog.common.close", default="Close"), self)
         close_btn.setObjectName("PrimaryAction")
         close_btn.clicked.connect(self.accept)
         btn_layout.addWidget(close_btn)
@@ -157,9 +162,10 @@ class ShortcutsDialog(QDialog):
     def _populate_table(self, *_) -> None:
         self.table.setRowCount(0)
         q = self.search_input.text().lower().strip()
-        cat_filter = self.category_combo.currentText()
-        if cat_filter == "All Categories":
-            cat_filter = ""
+        cat_filter = self.category_combo.currentData()
+        if cat_filter is None:
+            cat_text = self.category_combo.currentText()
+            cat_filter = "" if cat_text in ("All Categories", t("dialog.shortcuts.category_all", default="All Categories")) else cat_text
 
         sm = get_shortcut_manager()
         all_shortcuts = sm.get_all()
@@ -174,31 +180,48 @@ class ShortcutsDialog(QDialog):
             except Exception:
                 pass
 
+        cat_map = {
+            "file": t("menu.file", default="File").replace("&", ""),
+            "edit": t("menu.edit", default="Edit").replace("&", ""),
+            "view": t("menu.view", default="View").replace("&", ""),
+            "image": t("menu.image", default="Image").replace("&", ""),
+            "layers": t("menu.layers", default="Layers").replace("&", ""),
+            "filters": t("menu.filters", default="Filters").replace("&", ""),
+            "tools": t("menu.tools", default="Tools").replace("&", ""),
+            "brush": t("menu.brush", default="Brush").replace("&", ""),
+            "app": t("dialog.shortcuts.category_app", default="App"),
+            "help": t("menu.help", default="Help").replace("&", ""),
+        }
+
         matching = []
         for defn in all_shortcuts:
-            if cat_filter and defn.category.lower() != cat_filter.lower():
+            if cat_filter and defn.category.lower() != str(cat_filter).lower():
                 continue
+            cat_display = cat_map.get(defn.category.lower(), defn.category)
             if not q or (
                 q in defn.name.lower()
                 or q in defn.key_sequence.lower()
                 or q in defn.category.lower()
+                or q in cat_display.lower()
                 or q in defn.description.lower()
             ):
                 matching.append(defn)
 
         self._shortcuts_data = matching
         self.table.setRowCount(len(matching))
+        none_label = t("dialog.shortcuts.none", default="(None)")
         for row, defn in enumerate(matching):
             item_name = QTableWidgetItem(defn.name)
             item_name.setData(Qt.UserRole, defn.action_id)
             self.table.setItem(row, 0, item_name)
 
-            item_key = QTableWidgetItem(defn.key_sequence or "(None)")
+            item_key = QTableWidgetItem(defn.key_sequence or none_label)
             if not defn.key_sequence:
                 item_key.setForeground(Qt.gray)
             self.table.setItem(row, 1, item_key)
 
-            self.table.setItem(row, 2, QTableWidgetItem(defn.category))
+            cat_display = cat_map.get(defn.category.lower(), defn.category)
+            self.table.setItem(row, 2, QTableWidgetItem(cat_display))
             self.table.setItem(row, 3, QTableWidgetItem(defn.description))
 
     def _get_selected_definition(self) -> Optional[ShortcutDefinition]:
@@ -225,9 +248,14 @@ class ShortcutsDialog(QDialog):
                 if conflict:
                     ans = QMessageBox.question(
                         self,
-                        "Shortcut Conflict",
-                        f"'{new_key}' is already assigned to:\n<b>{conflict.name}</b> ({conflict.category})\n\n"
-                        f"Replace existing shortcut?",
+                        t("dialog.shortcuts.conflict_title", default="Shortcut Conflict"),
+                        t(
+                            "dialog.shortcuts.conflict_msg",
+                            key=new_key,
+                            name=conflict.name,
+                            category=conflict.category,
+                            default=f"'{new_key}' is already assigned to:\n<b>{conflict.name}</b> ({conflict.category})\n\nReplace existing shortcut?",
+                        ),
                         QMessageBox.Yes | QMessageBox.No,
                         QMessageBox.No,
                     )
@@ -261,8 +289,8 @@ class ShortcutsDialog(QDialog):
     def _on_reset_all(self) -> None:
         ans = QMessageBox.question(
             self,
-            "Reset All Shortcuts",
-            "Are you sure you want to restore all shortcuts to factory defaults?",
+            t("dialog.shortcuts.reset_all_title", default="Reset All Shortcuts"),
+            t("dialog.shortcuts.reset_all_msg", default="Are you sure you want to restore all shortcuts to factory defaults?"),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )

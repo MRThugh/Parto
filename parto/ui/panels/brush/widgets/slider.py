@@ -74,6 +74,15 @@ class LabeledSliderSpinRow(QWidget):
         self.slider.valueChanged.connect(self._on_slider_changed)
         self.spin.valueChanged.connect(self._on_spin_changed)
 
+    def update_text(self, label: str, tooltip: str = "") -> None:
+        """Update label text and optional tooltip for localization."""
+        self.label.setText(label)
+        if tooltip:
+            self.setToolTip(tooltip)
+            self.label.setToolTip(tooltip)
+            self.slider.setToolTip(tooltip)
+            self.spin.setToolTip(tooltip)
+
     def _on_slider_changed(self, val: int) -> None:
         if self._updating:
             return
