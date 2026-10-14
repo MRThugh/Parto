@@ -64,12 +64,12 @@ class CropBar(QWidget):
 
         self.apply_btn = QPushButton(t("crop.apply"), self)
         self.apply_btn.setObjectName("PrimaryAction")
-        self.apply_btn.setToolTip("Apply Crop (Enter)")
+        self.apply_btn.setToolTip(t("crop.apply_tip", default="Apply Crop (Enter)"))
         self.apply_btn.clicked.connect(self.apply_clicked.emit)
         layout.addWidget(self.apply_btn)
 
         self.cancel_btn = QPushButton(t("crop.cancel"), self)
-        self.cancel_btn.setToolTip("Cancel Crop (Esc)")
+        self.cancel_btn.setToolTip(t("crop.cancel_tip", default="Cancel Crop (Esc)"))
         self.cancel_btn.clicked.connect(self.cancel_clicked.emit)
         layout.addWidget(self.cancel_btn)
 
@@ -92,7 +92,9 @@ class CropBar(QWidget):
         """Refresh displayed texts on language change."""
         self.title_label.setText(t("action.edit.crop", default="Crop:"))
         self.apply_btn.setText(t("crop.apply"))
+        self.apply_btn.setToolTip(t("crop.apply_tip", default="Apply Crop (Enter)"))
         self.cancel_btn.setText(t("crop.cancel"))
+        self.cancel_btn.setToolTip(t("crop.cancel_tip", default="Cancel Crop (Esc)"))
         self._populate_ratios()
 
     def set_dimension_text(self, text: str):

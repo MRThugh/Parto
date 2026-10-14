@@ -51,7 +51,7 @@ class LayerItemWidget(QWidget):
         self.vis_btn.setFixedSize(22, 22)
         self.vis_btn.setAutoRaise(True)
         self.vis_btn.setCursor(Qt.PointingHandCursor)
-        self.vis_btn.setToolTip("Toggle Layer Visibility")
+        self.vis_btn.setToolTip(t("panel.layers.toggle_vis", default="Toggle Layer Visibility"))
         self._update_eye_icon()
         self.vis_btn.clicked.connect(self._on_vis_clicked)
         layout.addWidget(self.vis_btn)
@@ -68,6 +68,9 @@ class LayerItemWidget(QWidget):
             pct_lbl = QLabel(f"{int(opacity * 100)}%", self)
             pct_lbl.setStyleSheet("font-size: 11px; opacity: 0.6;")
             layout.addWidget(pct_lbl)
+
+    def retranslate_ui(self):
+        self.vis_btn.setToolTip(t("panel.layers.toggle_vis", default="Toggle Layer Visibility"))
 
     def _update_eye_icon(self):
         icon_color = get_theme_manager().get_icon_color()
@@ -88,7 +91,7 @@ class LayersDock(QDockWidget):
     """
 
     def __init__(self, document: Document, parent: Optional[QWidget] = None):
-        super().__init__("Layers", parent)
+        super().__init__(t("panel.layers.title", default="Layers"), parent)
         self.setObjectName("LayersDock")
         self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
         self.document = document

@@ -32,6 +32,22 @@ class AboutDialog(QDialog):
 
         self._init_ui()
 
+        try:
+            from parto.localization import get_localization_manager
+            self._lm = get_localization_manager()
+            if hasattr(self._lm, "locale_changed"):
+                self._lm.locale_changed.connect(self.retranslate_ui)
+                self.finished.connect(self._on_finished)
+        except Exception:
+            pass
+
+    def _on_finished(self, *_) -> None:
+        try:
+            if hasattr(self, "_lm") and hasattr(self._lm, "locale_changed"):
+                self._lm.locale_changed.disconnect(self.retranslate_ui)
+        except Exception:
+            pass
+
     def _init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
@@ -55,30 +71,52 @@ class AboutDialog(QDialog):
             "app.tagline",
             default="A fast, modern, and lightweight desktop image editor\nbuilt with Python, PySide6, and Pillow.",
         )
-        desc_label = QLabel(tagline, self)
-        desc_label.setAlignment(Qt.AlignCenter)
-        desc_label.setStyleSheet("font-size: 12px; color: #a1a1aa; line-height: 1.4;")
-        layout.addWidget(desc_label)
+        self.desc_label = QLabel(tagline, self)
+        self.desc_label.setAlignment(Qt.AlignCenter)
+        self.desc_label.setStyleSheet("font-size: 12px; color: #a1a1aa; line-height: 1.4;")
+        layout.addWidget(self.desc_label)
 
         # Author & Repo info
         lbl_author = t("app.author", default="Author & Maintainer")
         lbl_license = t("app.license", default="License")
         lbl_repo = t("app.repository", default="Repository")
-        author_label = QLabel(
+        self.author_label = QLabel(
             f"<b>{lbl_author}:</b> {__author__}<br>"
             f"<b>{lbl_license}:</b> MIT Open Source<br>"
             f"<b>{lbl_repo}:</b> <a style='color: #0284c7;' href='https://github.com/MRThugh/Parto'>github.com/MRThugh/Parto</a>",
             self,
         )
-        author_label.setOpenExternalLinks(True)
-        author_label.setAlignment(Qt.AlignCenter)
-        author_label.setStyleSheet("font-size: 12px; margin-top: 6px;")
-        layout.addWidget(author_label)
+        self.author_label.setOpenExternalLinks(True)
+        self.author_label.setAlignment(Qt.AlignCenter)
+        self.author_label.setStyleSheet("font-size: 12px; margin-top: 6px;")
+        layout.addWidget(self.author_label)
 
         layout.addSpacing(10)
 
         # Close
-        close_btn = QPushButton(t("dialog.common.close", default="Close"), self)
-        close_btn.setObjectName("PrimaryAction")
-        close_btn.clicked.connect(self.accept)
-        layout.addWidget(close_btn, alignment=Qt.AlignCenter)
+        self.close_btn = QPushButton(t("dialog.common.close", default="Close"), self)
+        self.close_btn.setObjectName("PrimaryAction")
+        self.close_btn.clicked.connect(self.accept)
+        layout.addWidget(self.close_btn, alignment=Qt.AlignCenter)
+
+    def retranslate_ui(self):
+        from parto.localization import t, get_localization_manager
+        lm = get_localization_manager()
+        self.setWindowTitle(t("dialog.about.title", default="About Parto"))
+        self.setLayoutDirection(Qt.RightToLeft if lm.is_rtl else Qt.LeftToRight)
+        if hasattr(self, "desc_label"):
+            self.desc_label.setText(t(
+                "app.tagline",
+                default="A fast, modern, and lightweight desktop image editor\nbuilt with Python, PySide6, and Pillow.",
+            ))
+        if hasattr(self, "author_label"):
+            lbl_author = t("app.author", default="Author & Maintainer")
+            lbl_license = t("app.license", default="License")
+            lbl_repo = t("app.repository", default="Repository")
+            self.author_label.setText(
+                f"<b>{lbl_author}:</b> {__author__}<br>"
+                f"<b>{lbl_license}:</b> MIT Open Source<br>"
+                f"<b>{lbl_repo}:</b> <a style='color: #0284c7;' href='https://github.com/MRThugh/Parto'>github.com/MRThugh/Parto</a>"
+            )
+        if hasattr(self, "close_btn"):
+            self.close_btn.setText(t("dialog.common.close", default="Close"))

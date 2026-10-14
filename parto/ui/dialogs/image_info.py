@@ -37,6 +37,22 @@ class ImageInfoDialog(QDialog):
 
         self._init_ui()
 
+        try:
+            from parto.localization import get_localization_manager
+            self._lm = get_localization_manager()
+            if hasattr(self._lm, "locale_changed"):
+                self._lm.locale_changed.connect(self.retranslate_ui)
+                self.finished.connect(self._on_finished)
+        except Exception:
+            pass
+
+    def _on_finished(self, *_) -> None:
+        try:
+            if hasattr(self, "_lm") and hasattr(self._lm, "locale_changed"):
+                self._lm.locale_changed.disconnect(self.retranslate_ui)
+        except Exception:
+            pass
+
     def _init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
@@ -55,6 +71,27 @@ class ImageInfoDialog(QDialog):
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
 
+        self._populate_properties()
+        layout.addWidget(self.table)
+
+        # Buttons
+        btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(10)
+
+        self.copy_path_btn = QPushButton(t("dialog.info.copy_path", default="Copy File Path"), self)
+        self.copy_path_btn.clicked.connect(self._copy_path)
+        btn_layout.addWidget(self.copy_path_btn)
+
+        btn_layout.addStretch()
+
+        self.close_btn = QPushButton(t("dialog.common.close", default="Close"), self)
+        self.close_btn.setObjectName("PrimaryAction")
+        self.close_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(self.close_btn)
+
+        layout.addLayout(btn_layout)
+
+    def _populate_properties(self):
         has_alpha = self.metadata.get("has_alpha")
         transparency_str = (
             t("dialog.info.alpha_yes", default="Yes (Alpha Channel)")
@@ -80,24 +117,21 @@ class ImageInfoDialog(QDialog):
             self.table.setItem(i, 0, item_p)
             self.table.setItem(i, 1, item_v)
 
-        layout.addWidget(self.table)
-
-        # Buttons
-        btn_layout = QHBoxLayout()
-        btn_layout.setSpacing(10)
-
-        copy_path_btn = QPushButton(t("dialog.info.copy_path", default="Copy File Path"), self)
-        copy_path_btn.clicked.connect(self._copy_path)
-        btn_layout.addWidget(copy_path_btn)
-
-        btn_layout.addStretch()
-
-        close_btn = QPushButton(t("dialog.common.close", default="Close"), self)
-        close_btn.setObjectName("PrimaryAction")
-        close_btn.clicked.connect(self.accept)
-        btn_layout.addWidget(close_btn)
-
-        layout.addLayout(btn_layout)
+    def retranslate_ui(self):
+        from parto.localization import t, get_localization_manager
+        lm = get_localization_manager()
+        self.setWindowTitle(t("dialog.info.title", default="Image Properties — Parto"))
+        self.setLayoutDirection(Qt.RightToLeft if lm.is_rtl else Qt.LeftToRight)
+        if hasattr(self, "table"):
+            self.table.setHorizontalHeaderLabels([
+                t("dialog.info.prop", default="Property"),
+                t("dialog.info.value", default="Value"),
+            ])
+            self._populate_properties()
+        if hasattr(self, "copy_path_btn"):
+            self.copy_path_btn.setText(t("dialog.info.copy_path", default="Copy File Path"))
+        if hasattr(self, "close_btn"):
+            self.close_btn.setText(t("dialog.common.close", default="Close"))
 
     def _copy_path(self):
         path = str(self.metadata.get("file_path", ""))

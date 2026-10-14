@@ -23,23 +23,26 @@ from PySide6.QtWidgets import (
 )
 from parto.brush.models.settings import BrushSettings
 from parto.brush.presets.preset_manager import BrushPresetManager
+from parto.localization import t
 from .widgets.preset_grid import PresetGridWidget
 from .widgets.section import CollapsibleSection
 
 
-CATEGORIES: List[str] = [
-    "All",
-    "Basic",
-    "Pencil",
-    "Ink",
-    "Paint",
-    "Airbrush",
-    "Marker",
-    "Texture",
-    "Eraser",
-    "Custom",
-    "★ Favorites",
+CATEGORY_SPECS: List[Tuple[str, str, str]] = [
+    ("All", "brush.presets.category_all", "All"),
+    ("Basic", "brush.presets.category_basic", "Basic"),
+    ("Pencil", "brush.presets.category_pencil", "Pencil"),
+    ("Ink", "brush.presets.category_ink", "Ink"),
+    ("Paint", "brush.presets.category_paint", "Paint"),
+    ("Airbrush", "brush.presets.category_airbrush", "Airbrush"),
+    ("Marker", "brush.presets.category_marker", "Marker"),
+    ("Texture", "brush.presets.category_texture", "Texture"),
+    ("Eraser", "brush.presets.category_eraser", "Eraser"),
+    ("Custom", "brush.presets.category_custom", "Custom"),
+    ("★ Favorites", "brush.presets.category_favorites", "★ Favorites"),
 ]
+
+CATEGORIES: List[str] = [cat[0] for cat in CATEGORY_SPECS]
 
 
 class BrushPresetsSection(QWidget):
@@ -63,7 +66,7 @@ class BrushPresetsSection(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
 
-        self.section = CollapsibleSection("Brush Presets", collapsed=False, parent=self)
+        self.section = CollapsibleSection(t("brush.studio.presets_title", default="Brush Presets"), collapsed=False, parent=self)
         layout.addWidget(self.section)
 
         # Content of Section
@@ -72,15 +75,15 @@ class BrushPresetsSection(QWidget):
         filter_row.setSpacing(6)
 
         self.search_edit = QLineEdit(self)
-        self.search_edit.setPlaceholderText("🔍 Search presets... (Ctrl+Shift+B)")
+        self.search_edit.setPlaceholderText(t("brush.studio.search_placeholder", default="🔍 Search presets... (Ctrl+Shift+B)"))
         self.search_edit.setClearButtonEnabled(True)
         self.search_edit.textChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self.search_edit, stretch=3)
 
         self.category_combo = QComboBox(self)
-        self.category_combo.addItems(CATEGORIES)
+        self._populate_categories()
         self.category_combo.setFixedWidth(105)
-        self.category_combo.currentTextChanged.connect(self._on_filter_changed)
+        self.category_combo.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self.category_combo, stretch=2)
 
         self.section.add_layout(filter_row)
@@ -101,23 +104,40 @@ class BrushPresetsSection(QWidget):
         btn_row = QHBoxLayout()
         btn_row.setSpacing(6)
 
-        self.btn_save = QPushButton("+ Save Preset...", self)
-        self.btn_save.setToolTip("Save current brush settings as a new custom preset")
+        self.btn_save = QPushButton(t("brush.presets.save_btn", default="+ Save Preset..."), self)
+        self.btn_save.setToolTip(t("brush.presets.save_tip", default="Save current brush settings as a new custom preset"))
         self.btn_save.clicked.connect(self.save_new_preset)
         btn_row.addWidget(self.btn_save)
 
-        self.btn_dup = QPushButton("Duplicate", self)
-        self.btn_dup.setToolTip("Duplicate selected preset (Ctrl+D)")
+        self.btn_dup = QPushButton(t("brush.presets.duplicate_btn", default="Duplicate"), self)
+        self.btn_dup.setToolTip(t("brush.presets.duplicate_tip", default="Duplicate selected preset (Ctrl+D)"))
         self.btn_dup.clicked.connect(self._on_duplicate_clicked)
         btn_row.addWidget(self.btn_dup)
 
-        self.btn_del = QPushButton("Delete", self)
-        self.btn_del.setToolTip("Delete selected user preset (Delete)")
+        self.btn_del = QPushButton(t("brush.presets.delete_btn", default="Delete"), self)
+        self.btn_del.setToolTip(t("brush.presets.delete_tip", default="Delete selected user preset (Delete)"))
         self.btn_del.clicked.connect(self._on_delete_clicked)
         btn_row.addWidget(self.btn_del)
 
         self.section.add_layout(btn_row)
         self.refresh()
+
+    def _populate_categories(self) -> None:
+        current_data = self.category_combo.currentData() if self.category_combo.count() > 0 else "All"
+        self.category_combo.blockSignals(True)
+        self.category_combo.clear()
+        for cat_id, key, def_txt in CATEGORY_SPECS:
+            label = t(key, default=def_txt)
+            self.category_combo.addItem(label, cat_id)
+        matched = False
+        for idx in range(self.category_combo.count()):
+            if self.category_combo.itemData(idx) == current_data:
+                self.category_combo.setCurrentIndex(idx)
+                matched = True
+                break
+        if not matched and self.category_combo.count() > 0:
+            self.category_combo.setCurrentIndex(0)
+        self.category_combo.blockSignals(False)
 
     def focus_search(self) -> None:
         """Focus the search input for rapid keyboard search."""
@@ -140,8 +160,10 @@ class BrushPresetsSection(QWidget):
     def apply_filter(self) -> None:
         """Apply query and category filters to the grid in-place."""
         query = self.search_edit.text()
-        cat = self.category_combo.currentText()
-        self.grid.filter_items(query=query, category=cat)
+        cat = self.category_combo.currentData()
+        if cat is None:
+            cat = self.category_combo.currentText()
+        self.grid.filter_items(query=query, category=str(cat))
         self._update_btn_states()
 
     def _on_filter_changed(self, *_) -> None:
@@ -187,8 +209,8 @@ class BrushPresetsSection(QWidget):
 
         confirm = QMessageBox.question(
             self,
-            "Delete Preset",
-            f"Are you sure you want to delete preset '{name}'?",
+            t("brush.presets.delete_title", default="Delete Preset"),
+            t("brush.presets.delete_confirm", name=name, default=f"Are you sure you want to delete preset '{name}'?"),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
@@ -205,8 +227,8 @@ class BrushPresetsSection(QWidget):
 
         new_name, ok = QInputDialog.getText(
             self,
-            "Rename Preset",
-            "New Preset Name:",
+            t("brush.presets.rename_title", default="Rename Preset"),
+            t("brush.presets.rename_label", default="New Preset Name:"),
             text=old_name,
         )
         if ok and new_name.strip() and new_name.strip() != old_name:
@@ -222,8 +244,8 @@ class BrushPresetsSection(QWidget):
         default_name = f"Custom {len(self.preset_manager.get_user_presets()) + 1}"
         name, ok = QInputDialog.getText(
             self,
-            "Save Brush Preset",
-            "Preset Name:",
+            t("brush.presets.save_title", default="Save Brush Preset"),
+            t("brush.presets.save_label", default="Preset Name:"),
             text=default_name,
         )
         if ok and name.strip():
@@ -244,7 +266,7 @@ class BrushPresetsSection(QWidget):
         clean_file_name = "".join(c for c in preset.name if c.isalnum() or c in (" ", "_", "-")).rstrip()
         path, _ = QFileDialog.getSaveFileName(
             self,
-            "Export Brush Preset",
+            t("brush.presets.export_title", default="Export Brush Preset"),
             f"{clean_file_name}.json",
             "Parto Brush Presets (*.json)",
         )
@@ -254,7 +276,7 @@ class BrushPresetsSection(QWidget):
     def import_preset_file(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self,
-            "Import Brush Preset",
+            t("brush.presets.import_title", default="Import Brush Preset"),
             "",
             "Parto Brush Presets (*.json);;All Files (*.*)",
         )
@@ -264,10 +286,22 @@ class BrushPresetsSection(QWidget):
                 self.refresh()
                 self.preset_changed.emit(imported.name)
             else:
-                QMessageBox.warning(self, "Import Failed", f"Could not read brush preset from {os.path.basename(path)}")
+                QMessageBox.warning(
+                    self,
+                    t("brush.presets.import_failed_title", default="Import Failed"),
+                    t("brush.presets.import_failed_msg", filename=os.path.basename(path), default=f"Could not read brush preset from {os.path.basename(path)}"),
+                )
 
     def retranslate_ui(self) -> None:
-        """Update presets section header and search placeholder with active language."""
-        from parto.localization import t
+        """Update presets section header, buttons, and search placeholder with active language."""
         self.section.set_title(t("brush.studio.presets_title", default="Brush Presets"))
         self.search_edit.setPlaceholderText(t("brush.studio.search_placeholder", default="🔍 Search presets... (Ctrl+Shift+B)"))
+        self.btn_save.setText(t("brush.presets.save_btn", default="+ Save Preset..."))
+        self.btn_save.setToolTip(t("brush.presets.save_tip", default="Save current brush settings as a new custom preset"))
+        self.btn_dup.setText(t("brush.presets.duplicate_btn", default="Duplicate"))
+        self.btn_dup.setToolTip(t("brush.presets.duplicate_tip", default="Duplicate selected preset (Ctrl+D)"))
+        self.btn_del.setText(t("brush.presets.delete_btn", default="Delete"))
+        self.btn_del.setToolTip(t("brush.presets.delete_tip", default="Delete selected user preset (Delete)"))
+        self._populate_categories()
+        if hasattr(self.grid, "retranslate_ui"):
+            self.grid.retranslate_ui()

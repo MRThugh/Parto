@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 )
 from parto.brush.models.preset import BrushPreset
 from parto.themes.manager import get_theme_manager
+from parto.localization import t
 
 
 class PresetGridWidget(QListWidget):
@@ -91,9 +92,9 @@ class PresetGridWidget(QListWidget):
             if p.description:
                 details.append(p.description)
             if p.is_builtin:
-                details.append("[Built-in Preset]")
+                details.append(t("brush.presets.builtin_tag", default="[Built-in Preset]"))
             else:
-                details.append("[User Preset]")
+                details.append(t("brush.presets.user_tag", default="[User Preset]"))
             item.setToolTip("\n".join(details))
 
             self.addItem(item)
@@ -264,21 +265,21 @@ class PresetGridWidget(QListWidget):
             return
 
         menu = QMenu(self)
-        act_select = menu.addAction(f"Activate '{name}' (Enter)")
+        act_select = menu.addAction(t("brush.presets.menu_activate", name=name, default=f"Activate '{name}' (Enter)"))
         menu.addSeparator()
 
-        fav_label = "★ Remove from Favorites" if p.favorite else "☆ Add to Favorites"
+        fav_label = t("brush.presets.menu_remove_fav", default="★ Remove from Favorites") if p.favorite else t("brush.presets.menu_add_fav", default="☆ Add to Favorites")
         act_fav = menu.addAction(fav_label)
 
-        act_dup = menu.addAction("Duplicate Preset (Ctrl+D)")
-        act_rename = menu.addAction("Rename Preset...")
-        act_export = menu.addAction("Export Preset...")
+        act_dup = menu.addAction(t("brush.presets.menu_duplicate", default="Duplicate Preset (Ctrl+D)"))
+        act_rename = menu.addAction(t("brush.presets.menu_rename", default="Rename Preset..."))
+        act_export = menu.addAction(t("brush.presets.menu_export", default="Export Preset..."))
         menu.addSeparator()
 
-        act_delete = menu.addAction("Delete Preset (Delete)")
+        act_delete = menu.addAction(t("brush.presets.menu_delete", default="Delete Preset (Delete)"))
         if p.is_builtin:
             act_delete.setEnabled(False)
-            act_delete.setText("Delete Preset (Built-in protected)")
+            act_delete.setText(t("brush.presets.menu_delete_builtin", default="Delete Preset (Built-in protected)"))
             act_rename.setEnabled(False)
 
         chosen = menu.exec(event.globalPos())
@@ -325,3 +326,27 @@ class PresetGridWidget(QListWidget):
             return
 
         super().keyPressEvent(event)
+
+    def retranslate_ui(self) -> None:
+        """Refresh preset tooltips on locale change."""
+        preset_map = {p.name: p for p in self._presets}
+        builtin_tag = t("brush.presets.builtin_tag", default="[Built-in Preset]")
+        user_tag = t("brush.presets.user_tag", default="[User Preset]")
+        for i in range(self.count()):
+            item = self.item(i)
+            name = str(item.data(Qt.UserRole))
+            p = preset_map.get(name)
+            if not p:
+                continue
+            details = [
+                f"{p.name} ({p.category})",
+                f"Size: {p.size} px • Hardness: {int(round(p.hardness * 100))}%",
+                f"Opacity: {int(round(p.opacity * 100))}% • Spacing: {int(round(p.spacing * 100))}%",
+            ]
+            if p.description:
+                details.append(p.description)
+            if p.is_builtin:
+                details.append(builtin_tag)
+            else:
+                details.append(user_tag)
+            item.setToolTip("\n".join(details))

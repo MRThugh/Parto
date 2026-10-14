@@ -186,12 +186,12 @@ class BrushBar(QWidget):
     colors_changed = Signal(tuple, tuple)  # fg, bg
 
     QUICK_COLORS = [
-        ("#000000", "Black"),
-        ("#ffffff", "White"),
-        ("#ef4444", "Red"),
-        ("#3b82f6", "Blue"),
-        ("#22c55e", "Green"),
-        ("#eab308", "Yellow"),
+        ("#000000", "Black", "brush.bar.color_black"),
+        ("#ffffff", "White", "brush.bar.color_white"),
+        ("#ef4444", "Red", "brush.bar.color_red"),
+        ("#3b82f6", "Blue", "brush.bar.color_blue"),
+        ("#22c55e", "Green", "brush.bar.color_green"),
+        ("#eab308", "Yellow", "brush.bar.color_yellow"),
     ]
 
     def __init__(self, parent: Optional[QWidget] = None):
@@ -218,7 +218,7 @@ class BrushBar(QWidget):
         self.preview.clicked.connect(self._open_color_dialog)
         main_layout.addWidget(self.preview)
 
-        self.title_label = QLabel("Brush", self)
+        self.title_label = QLabel(t("tool.brush", default="Brush"), self)
         self.title_label.setObjectName("BrushBarTitle")
         self.title_label.setStyleSheet("font-weight: 700; font-size: 11px; letter-spacing: 0.5px;")
         main_layout.addWidget(self.title_label)
@@ -255,7 +255,7 @@ class BrushBar(QWidget):
 
         # Primary interactive color chip
         self.color_chip = ColorChipButton(self)
-        self.color_chip.setToolTip("Active Brush Color (Click to change)")
+        self.color_chip.setToolTip(t("brush.bar.color_chip_tip", default="Active Brush Color (Click to change)"))
         self.color_chip.clicked.connect(self._open_color_dialog)
         color_layout.addWidget(self.color_chip)
 
@@ -267,7 +267,7 @@ class BrushBar(QWidget):
         self.swap_btn.setText("⇄")
         self.swap_btn.setFixedSize(20, 20)
         self.swap_btn.setCursor(Qt.PointingHandCursor)
-        self.swap_btn.setToolTip("Swap Foreground / Background Colors (X)")
+        self.swap_btn.setToolTip(t("brush.bar.swap_colors", default="Swap Foreground / Background Colors (X)"))
         self.swap_btn.clicked.connect(self._on_swap_colors)
         actions_layout.addWidget(self.swap_btn)
 
@@ -275,7 +275,7 @@ class BrushBar(QWidget):
         self.reset_btn.setText("D")
         self.reset_btn.setFixedSize(20, 20)
         self.reset_btn.setCursor(Qt.PointingHandCursor)
-        self.reset_btn.setToolTip("Reset to Default Black / White (D)")
+        self.reset_btn.setToolTip(t("brush.bar.reset_colors", default="Reset to Default Black / White (D)"))
         self.reset_btn.clicked.connect(self._on_reset_colors)
         actions_layout.addWidget(self.reset_btn)
 
@@ -284,12 +284,18 @@ class BrushBar(QWidget):
         # Quick Swatches
         swatch_layout = QHBoxLayout()
         swatch_layout.setSpacing(4)
-        for hex_code, name in self.QUICK_COLORS:
+        for item in self.QUICK_COLORS:
+            hex_code = item[0]
+            default_name = item[1]
+            key = item[2] if len(item) > 2 else ""
             btn = QToolButton(self)
             btn.setFixedSize(16, 16)
             btn.setCursor(Qt.PointingHandCursor)
-            btn.setToolTip(f"{name} ({hex_code})")
+            localized_name = t(key, default=default_name) if key else default_name
+            btn.setToolTip(f"{localized_name} ({hex_code})")
             btn.setProperty("hex_code", hex_code)
+            btn.setProperty("color_key", key)
+            btn.setProperty("default_name", default_name)
             btn.clicked.connect(lambda _, c=hex_code: self._set_color_from_hex(c))
             self._swatch_buttons.append(btn)
             swatch_layout.addWidget(btn)
@@ -302,7 +308,7 @@ class BrushBar(QWidget):
         size_layout.setSpacing(6)
         size_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.lbl_size = QLabel("Size:", self)
+        self.lbl_size = QLabel(t("brush.bar.size", default="Size:"), self)
         self.lbl_size.setStyleSheet("font-size: 11px; font-weight: 500;")
         size_layout.addWidget(self.lbl_size)
 
@@ -313,7 +319,7 @@ class BrushBar(QWidget):
         self.slider_size.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.slider_size.setMinimumWidth(60)
         self.slider_size.setMaximumWidth(110)
-        self.slider_size.setToolTip("Brush Size in pixels ([ and ] shortcuts)")
+        self.slider_size.setToolTip(t("brush.bar.size_tip", default="Brush Size in pixels ([ and ] shortcuts)"))
         size_layout.addWidget(self.slider_size)
 
         self.spin_size = QSpinBox(self)
@@ -335,7 +341,7 @@ class BrushBar(QWidget):
         dynamics_layout.setContentsMargins(0, 0, 0, 0)
 
         # Opacity
-        self.lbl_op = QLabel("Opacity:", self)
+        self.lbl_op = QLabel(t("brush.bar.opacity", default="Opacity:"), self)
         self.lbl_op.setStyleSheet("font-size: 11px; font-weight: 500;")
         dynamics_layout.addWidget(self.lbl_op)
 
@@ -359,7 +365,7 @@ class BrushBar(QWidget):
         self.spin_opacity.valueChanged.connect(self._on_opacity_spin_changed)
 
         # Hardness
-        self.lbl_hard = QLabel("Hardness:", self)
+        self.lbl_hard = QLabel(t("brush.bar.hardness", default="Hardness:"), self)
         self.lbl_hard.setStyleSheet("font-size: 11px; font-weight: 500;")
         dynamics_layout.addWidget(self.lbl_hard)
 
@@ -474,7 +480,7 @@ class BrushBar(QWidget):
         r, g, b, a = self._color
         initial = QColor(r, g, b, a)
         color = QColorDialog.getColor(
-            initial, self, "Select Brush Color", QColorDialog.ShowAlphaChannel
+            initial, self, t("brush.color.select_fg", default="Select Brush Color"), QColorDialog.ShowAlphaChannel
         )
         if color.isValid():
             rgba = (color.red(), color.green(), color.blue(), color.alpha())
@@ -619,15 +625,28 @@ class BrushBar(QWidget):
     def retranslate_ui(self) -> None:
         """Update brush bar labels and tooltips with current locale."""
         from ...localization import t
+        if hasattr(self, "preview") and hasattr(self.preview, "retranslate_ui"):
+            self.preview.retranslate_ui()
         if hasattr(self, "title_label"):
             self.title_label.setText(t("tool.brush", default="Brush"))
         if hasattr(self, "lbl_size"):
             self.lbl_size.setText(t("brush.bar.size", default="Size:"))
+        if hasattr(self, "slider_size"):
+            self.slider_size.setToolTip(t("brush.bar.size_tip", default="Brush Size in pixels ([ and ] shortcuts)"))
         if hasattr(self, "lbl_op"):
             self.lbl_op.setText(t("brush.bar.opacity", default="Opacity:"))
         if hasattr(self, "lbl_hard"):
             self.lbl_hard.setText(t("brush.bar.hardness", default="Hardness:"))
+        if hasattr(self, "color_chip"):
+            self.color_chip.setToolTip(t("brush.bar.color_chip_tip", default="Active Brush Color (Click to change)"))
         if hasattr(self, "swap_btn"):
             self.swap_btn.setToolTip(t("brush.bar.swap_colors", default="Swap Foreground / Background Colors (X)"))
         if hasattr(self, "reset_btn"):
             self.reset_btn.setToolTip(t("brush.bar.reset_colors", default="Reset to Default Black / White (D)"))
+        if hasattr(self, "_swatch_buttons"):
+            for btn in self._swatch_buttons:
+                hex_prop = btn.property("hex_code") or ""
+                key = btn.property("color_key") or ""
+                def_name = btn.property("default_name") or ""
+                loc_name = t(key, default=def_name) if key else def_name
+                btn.setToolTip(f"{loc_name} ({hex_prop})")

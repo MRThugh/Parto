@@ -76,6 +76,39 @@ class ShortcutsDialog(QDialog):
         self._init_ui()
         self._populate_table()
 
+        try:
+            from parto.localization import get_localization_manager
+            self._lm = get_localization_manager()
+            if hasattr(self._lm, "locale_changed"):
+                self._lm.locale_changed.connect(self.retranslate_ui)
+                self.finished.connect(self._on_finished)
+        except Exception:
+            pass
+
+    def _on_finished(self, *_) -> None:
+        try:
+            if hasattr(self, "_lm") and hasattr(self._lm, "locale_changed"):
+                self._lm.locale_changed.disconnect(self.retranslate_ui)
+        except Exception:
+            pass
+
+    def _init_categories(self) -> None:
+        cat_items = [
+            (t("dialog.shortcuts.category_all", default="All Categories"), ""),
+            (t("menu.brush", default="Brush").replace("&", ""), "Brush"),
+            (t("menu.tools", default="Tools").replace("&", ""), "Tools"),
+            (t("menu.file", default="File").replace("&", ""), "File"),
+            (t("menu.edit", default="Edit").replace("&", ""), "Edit"),
+            (t("menu.view", default="View").replace("&", ""), "View"),
+            (t("menu.image", default="Image").replace("&", ""), "Image"),
+            (t("menu.layers", default="Layers").replace("&", ""), "Layers"),
+            (t("menu.filters", default="Filters").replace("&", ""), "Filters"),
+            (t("dialog.shortcuts.category_app", default="App"), "App"),
+            (t("menu.help", default="Help").replace("&", ""), "Help"),
+        ]
+        for label, data in cat_items:
+            self.category_combo.addItem(label, data)
+
     def _init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -92,16 +125,7 @@ class ShortcutsDialog(QDialog):
         top_row.addWidget(self.search_input, stretch=3)
 
         self.category_combo = QComboBox(self)
-        self.category_combo.addItem(t("dialog.shortcuts.category_all", default="All Categories"), "")
-        self.category_combo.addItem(t("menu.brush", default="Brush").replace("&", ""), "Brush")
-        self.category_combo.addItem(t("menu.tools", default="Tools").replace("&", ""), "Tools")
-        self.category_combo.addItem(t("menu.file", default="File").replace("&", ""), "File")
-        self.category_combo.addItem(t("menu.edit", default="Edit").replace("&", ""), "Edit")
-        self.category_combo.addItem(t("menu.view", default="View").replace("&", ""), "View")
-        self.category_combo.addItem(t("menu.image", default="Image").replace("&", ""), "Image")
-        self.category_combo.addItem(t("menu.layers", default="Layers").replace("&", ""), "Layers")
-        self.category_combo.addItem(t("menu.filters", default="Filters").replace("&", ""), "Filters")
-        self.category_combo.addItem(t("dialog.shortcuts.category_app", default="App"), "App")
+        self._init_categories()
         self.category_combo.currentIndexChanged.connect(self._populate_table)
         top_row.addWidget(self.category_combo, stretch=2)
 
@@ -152,12 +176,64 @@ class ShortcutsDialog(QDialog):
 
         btn_layout.addStretch()
 
-        close_btn = QPushButton(t("dialog.common.close", default="Close"), self)
-        close_btn.setObjectName("PrimaryAction")
-        close_btn.clicked.connect(self.accept)
-        btn_layout.addWidget(close_btn)
+        self.btn_close = QPushButton(t("dialog.common.close", default="Close"), self)
+        self.btn_close.setObjectName("PrimaryAction")
+        self.btn_close.clicked.connect(self.accept)
+        btn_layout.addWidget(self.btn_close)
 
         layout.addLayout(btn_layout)
+
+    def retranslate_ui(self) -> None:
+        """Update shortcuts dialog title, headers, combo, and buttons on language change."""
+        from parto.localization import t, get_localization_manager
+        lm = get_localization_manager()
+        self.setWindowTitle(t("dialog.shortcuts.title", default="Keyboard Shortcuts — Parto"))
+        self.setLayoutDirection(Qt.RightToLeft if lm.is_rtl else Qt.LeftToRight)
+
+        if hasattr(self, "search_input"):
+            self.search_input.setPlaceholderText(
+                t("dialog.shortcuts.filter_placeholder", default="Filter shortcuts by action, key, or category...")
+            )
+
+        if hasattr(self, "category_combo"):
+            current_data = self.category_combo.currentData()
+            self.category_combo.blockSignals(True)
+            self.category_combo.clear()
+            self._init_categories()
+            matched = False
+            for idx in range(self.category_combo.count()):
+                if self.category_combo.itemData(idx) == current_data:
+                    self.category_combo.setCurrentIndex(idx)
+                    matched = True
+                    break
+            if not matched and self.category_combo.count() > 0:
+                self.category_combo.setCurrentIndex(0)
+            self.category_combo.blockSignals(False)
+
+        if hasattr(self, "table"):
+            self.table.setHorizontalHeaderLabels([
+                t("dialog.shortcuts.header_action", default="Action"),
+                t("dialog.shortcuts.header_key", default="Shortcut"),
+                t("dialog.shortcuts.header_category", default="Category"),
+                t("dialog.shortcuts.header_description", default="Description"),
+            ])
+
+        if hasattr(self, "btn_edit"):
+            self.btn_edit.setText(t("dialog.shortcuts.edit_btn", default="Edit Shortcut..."))
+            self.btn_edit.setToolTip(t("dialog.shortcuts.edit_tip", default="Customize the selected action's shortcut key combination"))
+        if hasattr(self, "btn_clear"):
+            self.btn_clear.setText(t("dialog.shortcuts.clear_btn", default="Clear"))
+            self.btn_clear.setToolTip(t("dialog.shortcuts.clear_tip", default="Remove keyboard shortcut from selected action"))
+        if hasattr(self, "btn_reset_action"):
+            self.btn_reset_action.setText(t("dialog.shortcuts.reset_action_btn", default="Reset Action"))
+            self.btn_reset_action.setToolTip(t("dialog.shortcuts.reset_action_tip", default="Reset selected action to factory default shortcut"))
+        if hasattr(self, "btn_reset_all"):
+            self.btn_reset_all.setText(t("dialog.shortcuts.reset_all_btn", default="Reset All to Defaults"))
+            self.btn_reset_all.setToolTip(t("dialog.shortcuts.reset_all_tip", default="Restore all application shortcuts to default bindings"))
+        if hasattr(self, "btn_close"):
+            self.btn_close.setText(t("dialog.common.close", default="Close"))
+
+        self._populate_table()
 
     def _populate_table(self, *_) -> None:
         self.table.setRowCount(0)

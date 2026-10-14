@@ -68,7 +68,8 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Parto — Lightweight Image Editor")
+        from ..localization import t
+        self.setWindowTitle(t("app.window_title", default="Parto — Lightweight Image Editor"))
         self.resize(1280, 800)
         self.setMinimumSize(800, 500)
         self.setAcceptDrops(True)
@@ -377,6 +378,9 @@ class MainWindow(QMainWindow):
             ("layers_dock", getattr(self, "layers_dock", None)),
             ("adjustments_dock", getattr(self, "adjustments_dock", None)),
             ("brush_dock", getattr(self, "brush_dock", None)),
+            ("shortcuts_dialog", getattr(self, "_current_shortcuts_dialog", None)),
+            ("about_dialog", getattr(self, "_current_about_dialog", None)),
+            ("info_dialog", getattr(self, "_current_info_dialog", None)),
         ]
 
         refresh_errors = []
@@ -501,7 +505,7 @@ class MainWindow(QMainWindow):
         if check_unsaved and not self.maybe_save_unsaved_changes():
             return
         if not os.path.exists(path):
-            QMessageBox.warning(self, "Error", f"File not found: {path}")
+            QMessageBox.warning(self, t("dialog.common.error", default="Error"), f"File not found: {path}")
             return
 
         success = self.document.load_file(path)
@@ -511,7 +515,11 @@ class MainWindow(QMainWindow):
             self.canvas.zoom_fit()
             self.toast.show_message(f"Opened {os.path.basename(path)}")
         else:
-            QMessageBox.critical(self, "Error", f"Failed to open image: {path}")
+            QMessageBox.critical(
+                self,
+                t("dialog.common.error", default="Error"),
+                t("dialog.error.open_failed", path=path, default=f"Failed to open image: {path}")
+            )
 
     def open_image_by_path(self, path: str):
         """Compatibility method for opening image by path."""
@@ -543,7 +551,11 @@ class MainWindow(QMainWindow):
             self.toast.show_message(t("toast.saved", filename=saved_name, default=f"Saved {saved_name}"))
             return SaveResult.SUCCESS
         else:
-            QMessageBox.critical(self, "Save Error", f"Could not save file: {err}")
+            QMessageBox.critical(
+                self,
+                t("dialog.error.save_title", default="Save Error"),
+                t("dialog.error.save_failed", error=str(err), default=f"Could not save file: {err}")
+            )
             return SaveResult.FAILED
 
     def action_save_as(self) -> SaveResult:
@@ -568,7 +580,11 @@ class MainWindow(QMainWindow):
                 self.toast.show_message(t("toast.saved", filename=saved_name, default=f"Saved {saved_name}"))
                 return SaveResult.SUCCESS
             else:
-                QMessageBox.critical(self, "Save Error", f"Could not save file: {err}")
+                QMessageBox.critical(
+                    self,
+                    t("dialog.error.save_title", default="Save Error"),
+                    t("dialog.error.save_failed", error=str(err), default=f"Could not save file: {err}")
+                )
                 return SaveResult.FAILED
         return SaveResult.CANCELLED
 
@@ -577,12 +593,20 @@ class MainWindow(QMainWindow):
 
     def action_show_info(self):
         if not self.document.has_image:
-            QMessageBox.information(self, "Properties", "No image is currently open.")
+            QMessageBox.information(
+                self,
+                t("dialog.info.title", default="Properties"),
+                t("dialog.info.no_image", default="No image is currently open.")
+            )
             return
 
         meta = get_image_metadata(self.document.get_composite(), self.document.filepath)
         dlg = ImageInfoDialog(meta, self)
-        dlg.exec()
+        self._current_info_dialog = dlg
+        try:
+            dlg.exec()
+        finally:
+            self._current_info_dialog = None
 
     # Edit & History Actions
     def action_undo(self):
@@ -756,11 +780,19 @@ class MainWindow(QMainWindow):
 
     def action_show_shortcuts(self):
         dlg = ShortcutsDialog(self)
-        dlg.exec()
+        self._current_shortcuts_dialog = dlg
+        try:
+            dlg.exec()
+        finally:
+            self._current_shortcuts_dialog = None
 
     def action_show_about(self):
         dlg = AboutDialog(self)
-        dlg.exec()
+        self._current_about_dialog = dlg
+        try:
+            dlg.exec()
+        finally:
+            self._current_about_dialog = None
 
     def action_toggle_fullscreen(self):
         if self.isFullScreen():
