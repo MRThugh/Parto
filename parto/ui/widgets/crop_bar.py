@@ -52,6 +52,7 @@ class CropBar(QWidget):
         layout.addWidget(self.title_label)
 
         self.ratio_combo = QComboBox(self)
+        self.ratio_combo.setToolTip(t("crop.ratio_tip", default="Constrain crop box proportions"))
         self._populate_ratios()
         self.ratio_combo.currentIndexChanged.connect(self._on_index_changed)
         layout.addWidget(self.ratio_combo)
@@ -95,6 +96,8 @@ class CropBar(QWidget):
         self.apply_btn.setToolTip(t("crop.apply_tip", default="Apply Crop (Enter)"))
         self.cancel_btn.setText(t("crop.cancel"))
         self.cancel_btn.setToolTip(t("crop.cancel_tip", default="Cancel Crop (Esc)"))
+        if hasattr(self, "ratio_combo"):
+            self.ratio_combo.setToolTip(t("crop.ratio_tip", default="Constrain crop box proportions"))
         self._populate_ratios()
 
     def set_dimension_text(self, text: str):

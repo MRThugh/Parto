@@ -50,28 +50,46 @@ class BrushDynamicsSection(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
 
-        self.section = CollapsibleSection("Dynamics", collapsed=True, parent=self)
+        from parto.localization import t
+
+        self.section = CollapsibleSection(t("brush.studio.dynamics_title", default="Dynamics"), collapsed=True, parent=self)
         layout.addWidget(self.section)
 
         # 1. Size Dynamics
-        self.combo_size = self._create_row("Size:", DYNAMICS_OPTIONS, "Modulate brush tip diameter based on stylus pressure or velocity")
+        self.lbl_size, self.combo_size = self._create_row(
+            t("brush.bar.size", default="Size:"),
+            DYNAMICS_OPTIONS,
+            t("brush.dynamics.size_tip", default="Modulate brush tip diameter based on stylus pressure or velocity"),
+        )
         self.combo_size.currentTextChanged.connect(self._on_size_dyn_changed)
 
         # 2. Opacity Dynamics
-        self.combo_opacity = self._create_row("Opacity:", DYNAMICS_OPTIONS, "Modulate opacity based on stylus pressure or velocity")
+        self.lbl_opacity, self.combo_opacity = self._create_row(
+            t("brush.bar.opacity", default="Opacity:"),
+            DYNAMICS_OPTIONS,
+            t("brush.dynamics.opacity_tip", default="Modulate opacity based on stylus pressure or velocity"),
+        )
         self.combo_opacity.currentTextChanged.connect(self._on_opacity_dyn_changed)
 
         # 3. Flow Dynamics
-        self.combo_flow = self._create_row("Flow:", DYNAMICS_OPTIONS, "Modulate ink flow rate based on pressure or velocity")
+        self.lbl_flow, self.combo_flow = self._create_row(
+            t("brush.studio.flow", default="Flow:"),
+            DYNAMICS_OPTIONS,
+            t("brush.dynamics.flow_tip", default="Modulate ink flow rate based on pressure or velocity"),
+        )
         self.combo_flow.currentTextChanged.connect(self._on_flow_dyn_changed)
 
         # 4. Angle Dynamics
-        self.combo_angle = self._create_row("Angle:", ANGLE_DYNAMICS_OPTIONS, "Modulate tip angle based on stroke direction, tilt, or random rotation")
+        self.lbl_angle, self.combo_angle = self._create_row(
+            t("brush.studio.angle", default="Angle:"),
+            ANGLE_DYNAMICS_OPTIONS,
+            t("brush.dynamics.angle_tip", default="Modulate tip angle based on stroke direction, tilt, or random rotation"),
+        )
         self.combo_angle.currentTextChanged.connect(self._on_angle_dyn_changed)
 
         self.sync_from_settings()
 
-    def _create_row(self, label: str, options: List[str], tooltip: str) -> QComboBox:
+    def _create_row(self, label: str, options: List[str], tooltip: str) -> tuple[QLabel, QComboBox]:
         row = QHBoxLayout()
         row.setSpacing(8)
 
@@ -87,7 +105,7 @@ class BrushDynamicsSection(QWidget):
         row.addWidget(combo)
 
         self.section.add_layout(row)
-        return combo
+        return lbl, combo
 
     def sync_from_settings(self) -> None:
         if self._updating:
@@ -132,6 +150,29 @@ class BrushDynamicsSection(QWidget):
             self.settings.set_dynamics_angle(text.lower())
 
     def retranslate_ui(self) -> None:
-        """Update dynamics section header with active language."""
+        """Update dynamics section header, row labels, and tooltips with active language."""
         from parto.localization import t
         self.section.set_title(t("brush.studio.dynamics_title", default="Dynamics"))
+        if hasattr(self, "lbl_size"):
+            self.lbl_size.setText(t("brush.bar.size", default="Size:"))
+            self.lbl_size.setToolTip(t("brush.dynamics.size_tip", default="Modulate brush tip diameter based on stylus pressure or velocity"))
+        if hasattr(self, "combo_size"):
+            self.combo_size.setToolTip(t("brush.dynamics.size_tip", default="Modulate brush tip diameter based on stylus pressure or velocity"))
+
+        if hasattr(self, "lbl_opacity"):
+            self.lbl_opacity.setText(t("brush.bar.opacity", default="Opacity:"))
+            self.lbl_opacity.setToolTip(t("brush.dynamics.opacity_tip", default="Modulate opacity based on stylus pressure or velocity"))
+        if hasattr(self, "combo_opacity"):
+            self.combo_opacity.setToolTip(t("brush.dynamics.opacity_tip", default="Modulate opacity based on stylus pressure or velocity"))
+
+        if hasattr(self, "lbl_flow"):
+            self.lbl_flow.setText(t("brush.studio.flow", default="Flow:"))
+            self.lbl_flow.setToolTip(t("brush.dynamics.flow_tip", default="Modulate ink flow rate based on pressure or velocity"))
+        if hasattr(self, "combo_flow"):
+            self.combo_flow.setToolTip(t("brush.dynamics.flow_tip", default="Modulate ink flow rate based on pressure or velocity"))
+
+        if hasattr(self, "lbl_angle"):
+            self.lbl_angle.setText(t("brush.studio.angle", default="Angle:"))
+            self.lbl_angle.setToolTip(t("brush.dynamics.angle_tip", default="Modulate tip angle based on stroke direction, tilt, or random rotation"))
+        if hasattr(self, "combo_angle"):
+            self.combo_angle.setToolTip(t("brush.dynamics.angle_tip", default="Modulate tip angle based on stroke direction, tilt, or random rotation"))

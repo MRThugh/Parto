@@ -118,6 +118,7 @@ class LayersDock(QDockWidget):
         self.opacity_slider = QSlider(Qt.Horizontal, self)
         self.opacity_slider.setRange(0, 100)
         self.opacity_slider.setValue(100)
+        self.opacity_slider.setToolTip(t("panel.layers.opacity_tip", default="Adjust selected layer transparency"))
         self.opacity_slider.sliderPressed.connect(self._on_opacity_slider_pressed)
         self.opacity_slider.valueChanged.connect(self._on_opacity_slider_changed)
         self.opacity_slider.sliderReleased.connect(self._on_opacity_slider_released)
@@ -293,6 +294,8 @@ class LayersDock(QDockWidget):
         self.setWindowTitle(t("panel.layers.title", default="Layers"))
         if hasattr(self, "op_lbl"):
             self.op_lbl.setText(t("panel.layers.opacity", default="Opacity:"))
+        if hasattr(self, "opacity_slider"):
+            self.opacity_slider.setToolTip(t("panel.layers.opacity_tip", default="Adjust selected layer transparency"))
         if hasattr(self, "add_btn"):
             self.add_btn.setToolTip(t("action.layer.new", default="Add New Layer"))
         if hasattr(self, "dup_btn"):

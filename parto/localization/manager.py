@@ -121,11 +121,20 @@ class LocalizationManager(_BaseEmitter):
         cls._instance = None
 
     def _init_bundled_catalogs(self) -> None:
-        """Locate and register factory catalogs from parto/resources/locales/."""
+        """Locate and register factory catalogs from parto/resources/locales/ and packaged bundles."""
         here = os.path.dirname(os.path.abspath(__file__))
         parto_root = os.path.dirname(here)
         bundled_locales_dir = os.path.join(parto_root, "resources", "locales")
         self.add_catalog_directory(bundled_locales_dir)
+
+        # Support PyInstaller frozen bundles
+        if hasattr(sys, "_MEIPASS"):
+            meipass_locales = os.path.join(sys._MEIPASS, "parto", "resources", "locales")
+            if os.path.isdir(meipass_locales):
+                self.add_catalog_directory(meipass_locales)
+            meipass_locales2 = os.path.join(sys._MEIPASS, "resources", "locales")
+            if os.path.isdir(meipass_locales2):
+                self.add_catalog_directory(meipass_locales2)
 
     def add_catalog_directory(self, directory: str) -> None:
         """Register an additional directory for automatic catalog discovery."""

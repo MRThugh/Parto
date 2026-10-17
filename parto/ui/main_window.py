@@ -381,6 +381,9 @@ class MainWindow(QMainWindow):
             ("shortcuts_dialog", getattr(self, "_current_shortcuts_dialog", None)),
             ("about_dialog", getattr(self, "_current_about_dialog", None)),
             ("info_dialog", getattr(self, "_current_info_dialog", None)),
+            ("filter_dialog", getattr(self, "_current_filter_dialog", None)),
+            ("resize_dialog", getattr(self, "_current_resize_dialog", None)),
+            ("command_palette", getattr(self, "_current_command_palette", None)),
         ]
 
         refresh_errors = []
@@ -429,17 +432,17 @@ class MainWindow(QMainWindow):
 
         if hasattr(self, "act_undo"):
             self.act_undo.setEnabled(can_u)
-            self.act_undo.setText(self.document.history.undo_description())
+            self.act_undo.setText(self.document.history.undo_description() if can_u else t("action.edit.undo", default="Undo"))
         if hasattr(self, "act_redo"):
             self.act_redo.setEnabled(can_r)
-            self.act_redo.setText(self.document.history.redo_description())
+            self.act_redo.setText(self.document.history.redo_description() if can_r else t("action.edit.redo", default="Redo"))
 
         if hasattr(self, "tb_act_undo"):
             self.tb_act_undo.setEnabled(can_u)
-            self.tb_act_undo.setToolTip(self.document.history.undo_description())
+            self.tb_act_undo.setToolTip(self.document.history.undo_description() if can_u else t("action.edit.undo_desc", default="Undo last action"))
         if hasattr(self, "tb_act_redo"):
             self.tb_act_redo.setEnabled(can_r)
-            self.tb_act_redo.setToolTip(self.document.history.redo_description())
+            self.tb_act_redo.setToolTip(self.document.history.redo_description() if can_r else t("action.edit.redo_desc", default="Redo previously undone action"))
 
         if hasattr(self, "action_manager"):
             self.action_manager.update_states()
@@ -480,7 +483,9 @@ class MainWindow(QMainWindow):
             return
         self.document.new_document(1920, 1080)
         self.canvas.zoom_fit()
-        self.toast.show_message("Created new 1920 × 1080 canvas")
+        self.toast.show_message(
+            t("toast.canvas_created", width=1920, height=1080, default="Created new 1920 × 1080 canvas")
+        )
 
     def action_open_image(self):
         if not self.maybe_save_unsaved_changes():
@@ -513,7 +518,9 @@ class MainWindow(QMainWindow):
             comp = self.document.get_composite()
             self.engine.set_original_image(comp)
             self.canvas.zoom_fit()
-            self.toast.show_message(f"Opened {os.path.basename(path)}")
+            self.toast.show_message(
+                t("toast.opened", filename=os.path.basename(path), default=f"Opened {os.path.basename(path)}")
+            )
         else:
             QMessageBox.critical(
                 self,

@@ -159,3 +159,12 @@ class CommandPalette(QDialog):
             event.accept()
         else:
             super().keyPressEvent(event)
+
+    def retranslate_ui(self) -> None:
+        """Update window title, placeholder text, and layout direction on locale change."""
+        from parto.localization import get_localization_manager
+        lm = get_localization_manager()
+        self.setLayoutDirection(Qt.RightToLeft if lm.is_rtl else Qt.LeftToRight)
+        self.setWindowTitle(t("dialog.palette.title", default="Command Palette — Parto"))
+        if hasattr(self, "search_input"):
+            self.search_input.setPlaceholderText(t("dialog.palette.placeholder", default="Type a command or search action..."))

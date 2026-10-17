@@ -6,7 +6,7 @@ Author & Maintainer: Ali Kamrani (علی کامرانی)
 """
 
 from __future__ import annotations
-from typing import Dict, Union, Optional, Set, List
+from typing import Dict, Union, Optional, Set, List, Tuple
 from .models import LocaleMetadata, TextDirection
 
 

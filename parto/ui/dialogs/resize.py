@@ -99,12 +99,7 @@ class ResizeDialog(QDialog):
         self.resample_lbl = QLabel(t("dialog.resize.resample", default="Resampling Quality:"), self)
         resample_layout.addWidget(self.resample_lbl)
         self.resample_combo = QComboBox(self)
-        self.resample_combo.addItems([
-            "Lanczos (Best Quality)",
-            "Bicubic (Balanced)",
-            "Bilinear (Fast)",
-            "Nearest (Pixel Art)",
-        ])
+        self._populate_resample_options()
         resample_layout.addWidget(self.resample_combo)
         layout.addLayout(resample_layout)
 
@@ -130,8 +125,27 @@ class ResizeDialog(QDialog):
 
         layout.addLayout(btn_layout)
 
+    def _populate_resample_options(self):
+        cur_idx = self.resample_combo.currentIndex() if hasattr(self, "resample_combo") and self.resample_combo.count() > 0 else 0
+        if cur_idx < 0:
+            cur_idx = 0
+        self.resample_combo.blockSignals(True)
+        self.resample_combo.clear()
+        for key, default_txt in [
+            ("dialog.resize.resample_lanczos", "Lanczos (Best Quality)"),
+            ("dialog.resize.resample_bicubic", "Bicubic (Balanced)"),
+            ("dialog.resize.resample_bilinear", "Bilinear (Fast)"),
+            ("dialog.resize.resample_nearest", "Nearest (Pixel Art)"),
+        ]:
+            self.resample_combo.addItem(t(key, default=default_txt))
+        self.resample_combo.setCurrentIndex(cur_idx)
+        self.resample_combo.blockSignals(False)
+
     def retranslate_ui(self):
         """Refresh dialog texts on locale change."""
+        from parto.localization import get_localization_manager
+        lm = get_localization_manager()
+        self.setLayoutDirection(Qt.RightToLeft if lm.is_rtl else Qt.LeftToRight)
         self.setWindowTitle(t("dialog.resize.title", default="Resize Image"))
         if hasattr(self, "dim_group"):
             self.dim_group.setTitle(t("dialog.resize.dimensions_group", default="Dimensions (Pixels)"))
@@ -145,6 +159,8 @@ class ResizeDialog(QDialog):
             self.preset_group.setTitle(t("dialog.resize.quick_presets", default="Quick Presets"))
         if hasattr(self, "resample_lbl"):
             self.resample_lbl.setText(t("dialog.resize.resample", default="Resampling Quality:"))
+        if hasattr(self, "resample_combo"):
+            self._populate_resample_options()
         if hasattr(self, "cancel_btn"):
             self.cancel_btn.setText(t("dialog.common.cancel", default="Cancel"))
         if hasattr(self, "apply_btn"):
@@ -194,7 +210,17 @@ class ResizeDialog(QDialog):
         h = self.height_spin.value()
         mp = (w * h) / 1_000_000.0
         pct = (w / float(self.orig_w)) * 100.0
-        self.info_label.setText(f"Result: {w} × {h} px ({mp:.2f} MP) — {pct:.0f}% of original")
+        self.info_label.setText(
+            t(
+                "dialog.resize.info",
+                orig_w=self.orig_w,
+                orig_h=self.orig_h,
+                w=w,
+                h=h,
+                mp=f"{mp:.2f}",
+                default=f"Result: {w} × {h} px ({mp:.2f} MP) — {pct:.0f}% of original",
+            )
+        )
 
     def get_dimensions(self) -> Tuple[int, int]:
         return self.width_spin.value(), self.height_spin.value()

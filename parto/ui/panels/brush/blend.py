@@ -143,9 +143,23 @@ class BrushBlendSection(QWidget):
         self.settings.set_is_eraser(checked)
 
     def retranslate_ui(self) -> None:
-        """Update blend section header and labels with active language."""
+        """Update blend section header, labels, and tooltips with active language."""
         from parto.localization import t
         self.section.set_title(t("brush.studio.blend_title", default="Blend & Rendering"))
-        self.row_opacity.label.setText(t("brush.bar.opacity", default="Opacity:"))
-        self.row_flow.label.setText(t("brush.studio.flow", default="Flow:"))
-        self.cb_eraser.setText(t("brush.studio.erase_mode", default="Erase Mode (Alpha Eraser)"))
+        if hasattr(self, "lbl_mode"):
+            self.lbl_mode.setText(t("brush.blend.mode", default="Blend Mode:"))
+        if hasattr(self, "combo_mode"):
+            self.combo_mode.setToolTip(t("brush.blend.mode_tip", default="Photometric blending calculation for brush dabs on the active layer"))
+        if hasattr(self, "row_opacity"):
+            self.row_opacity.update_text(
+                t("brush.bar.opacity", default="Opacity:"),
+                t("brush.blend.opacity_tip", default="Maximum opacity limit for the stroke (Keys 1-9, 0)"),
+            )
+        if hasattr(self, "row_flow"):
+            self.row_flow.update_text(
+                t("brush.studio.flow", default="Flow:"),
+                t("brush.blend.flow_tip", default="Rate at which paint deposits per stamped dab"),
+            )
+        if hasattr(self, "cb_eraser"):
+            self.cb_eraser.setText(t("brush.studio.erase_mode", default="Erase Mode (Alpha Eraser)"))
+            self.cb_eraser.setToolTip(t("brush.blend.eraser_tip", default="When checked, stroke removes layer opacity instead of depositing pigment (Shift+B)"))

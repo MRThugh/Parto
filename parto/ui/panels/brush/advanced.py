@@ -28,17 +28,19 @@ class BrushAdvancedSection(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
 
-        self.section = CollapsibleSection("Advanced & Stroke", collapsed=True, parent=self)
+        from parto.localization import t
+
+        self.section = CollapsibleSection(t("brush.studio.advanced_title", default="Advanced & Stroke"), collapsed=True, parent=self)
         layout.addWidget(self.section)
 
         # 1. Stroke Smoothing / Stabilization: 0 to 100 %
         self.row_smoothing = LabeledSliderSpinRow(
-            label="Smoothing:",
+            label=t("brush.studio.smoothing", default="Smoothing:"),
             min_val=0,
             max_val=100,
             suffix=" %",
             default_val=int(round(getattr(self.settings, "smoothing", 0.0) * 100)),
-            tooltip="Stroke stabilization filter reducing hand tremor and line jitter",
+            tooltip=t("brush.advanced.smoothing_tip", default="Stroke stabilization filter reducing hand tremor and line jitter"),
             parent=self,
         )
         self.row_smoothing.valueChanged.connect(self._on_smoothing_changed)
@@ -46,12 +48,12 @@ class BrushAdvancedSection(QWidget):
 
         # 2. Scatter: 0 to 100 %
         self.row_scatter = LabeledSliderSpinRow(
-            label="Scatter:",
+            label=t("brush.studio.scatter", default="Scatter:"),
             min_val=0,
             max_val=100,
             suffix=" %",
             default_val=int(round(getattr(self.settings, "scatter", 0.0) * 100)),
-            tooltip="Random spatial dispersion perpendicular to stroke direction",
+            tooltip=t("brush.advanced.scatter_tip", default="Random spatial dispersion perpendicular to stroke direction"),
             parent=self,
         )
         self.row_scatter.valueChanged.connect(self._on_scatter_changed)
@@ -59,12 +61,12 @@ class BrushAdvancedSection(QWidget):
 
         # 3. Size Jitter: 0 to 100 %
         self.row_size_jitter = LabeledSliderSpinRow(
-            label="Size Jitter:",
+            label=t("brush.studio.size_jitter", default="Size Jitter:"),
             min_val=0,
             max_val=100,
             suffix=" %",
             default_val=int(round(getattr(self.settings, "size_jitter", 0.0) * 100)),
-            tooltip="Stochastic variance in dab diameter along the stroke",
+            tooltip=t("brush.advanced.size_jitter_tip", default="Stochastic variance in dab diameter along the stroke"),
             parent=self,
         )
         self.row_size_jitter.valueChanged.connect(self._on_size_jitter_changed)
@@ -72,12 +74,12 @@ class BrushAdvancedSection(QWidget):
 
         # 4. Angle Jitter: 0 to 100 %
         self.row_angle_jitter = LabeledSliderSpinRow(
-            label="Angle Jitter:",
+            label=t("brush.studio.angle_jitter", default="Angle Jitter:"),
             min_val=0,
             max_val=100,
             suffix=" %",
             default_val=int(round(getattr(self.settings, "angle_jitter", 0.0) * 100)),
-            tooltip="Random angular deviation per stamped dab",
+            tooltip=t("brush.advanced.angle_jitter_tip", default="Random angular deviation per stamped dab"),
             parent=self,
         )
         self.row_angle_jitter.valueChanged.connect(self._on_angle_jitter_changed)
@@ -123,10 +125,22 @@ class BrushAdvancedSection(QWidget):
             self.settings.set_angle_jitter(val / 100.0)
 
     def retranslate_ui(self) -> None:
-        """Update advanced section header and row labels with active language."""
+        """Update advanced section header, row labels, and tooltips with active language."""
         from parto.localization import t
         self.section.set_title(t("brush.studio.advanced_title", default="Advanced & Stroke"))
-        self.row_smoothing.label.setText(t("brush.studio.smoothing", default="Smoothing:"))
-        self.row_scatter.label.setText(t("brush.studio.scatter", default="Scatter:"))
-        self.row_size_jitter.label.setText(t("brush.studio.size_jitter", default="Size Jitter:"))
-        self.row_angle_jitter.label.setText(t("brush.studio.angle_jitter", default="Angle Jitter:"))
+        self.row_smoothing.update_text(
+            t("brush.studio.smoothing", default="Smoothing:"),
+            t("brush.advanced.smoothing_tip", default="Stroke stabilization filter reducing hand tremor and line jitter"),
+        )
+        self.row_scatter.update_text(
+            t("brush.studio.scatter", default="Scatter:"),
+            t("brush.advanced.scatter_tip", default="Random spatial dispersion perpendicular to stroke direction"),
+        )
+        self.row_size_jitter.update_text(
+            t("brush.studio.size_jitter", default="Size Jitter:"),
+            t("brush.advanced.size_jitter_tip", default="Stochastic variance in dab diameter along the stroke"),
+        )
+        self.row_angle_jitter.update_text(
+            t("brush.studio.angle_jitter", default="Angle Jitter:"),
+            t("brush.advanced.angle_jitter_tip", default="Random angular deviation per stamped dab"),
+        )
