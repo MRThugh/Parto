@@ -37,12 +37,12 @@ parto/
 └── resources/
     └── locales/
         ├── en/
-        │   └── locale.json   # English factory catalog (362 top-level keys, 363 leaves, LTR)
+        │   └── locale.json   # English factory catalog (359 top-level keys, 360 leaves, LTR)
         └── fa/
-            └── locale.json   # Persian factory catalog (362 top-level keys, 363 leaves, RTL)
+            └── locale.json   # Persian factory catalog (359 top-level keys, 360 leaves, RTL)
 ```
 
-Both bundled catalogs (`en` and `fa`) contain exactly **362 top-level translation entries** (363 recursively flattened leaf string values accounting for the plural entry `layers.count` with `one` and `other` categories) with 100% key parity, complete codebase coverage, and zero placeholder discrepancies.
+Both bundled catalogs (`en` and `fa`) contain exactly **359 top-level translation entries** (360 recursively flattened leaf string values accounting for the plural entry `layers.count` with `one` and `other` categories) with 100% key parity, complete codebase coverage, and zero placeholder discrepancies.
 
 ---
 
@@ -98,8 +98,8 @@ Every catalog is stored as a UTF-8 encoded JSON document (`locale.json`):
 
 ### Catalog Key & Value Counting Definitions:
 To maintain consistency and reproducibility across all audits and developer documentation, counts are defined as:
-1. **Top-Level Translation Entry Count (`362 entries`):** Total distinct keys located directly under the `translations` JSON object (`len(catalog.keys())`).
-2. **Recursively Flattened Leaf Values (`363 values`):** Total primitive string values present in the catalog. A plural entry with two category forms (`layers.count`: `one`, `other`) counts as 1 top-level entry, but represents 2 leaf strings ($361 \text{ standard strings} + 2 \text{ plural strings} = 363 \text{ leaf values}$).
+1. **Top-Level Translation Entry Count (`359 entries`):** Total distinct keys located directly under the `translations` JSON object (`len(catalog.keys())`).
+2. **Recursively Flattened Leaf Values (`360 values`):** Total primitive string values present in the catalog. A plural entry with two category forms (`layers.count`: `one`, `other`) counts as 1 top-level entry, but represents 2 leaf strings ($358 \text{ standard strings} + 2 \text{ plural strings} = 360 \text{ leaf values}$).
 3. **Plural Entries (`1 entry`):** Entries whose values are Unicode CLDR grammatical plural dictionaries (`layers.count`).
 
 ### Duplicate JSON Key Detection:

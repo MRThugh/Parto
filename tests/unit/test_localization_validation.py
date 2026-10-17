@@ -99,7 +99,6 @@ def test_previously_reported_missing_keys_explicitly_present(bundled_catalogs):
     - dialog.info.alpha_no
     - dialog.resize.quick_presets
     - panel.adjustments.compare
-    - brush.toggle_studio
     """
     cat_en, cat_fa = bundled_catalogs
     critical_keys = [
@@ -108,7 +107,6 @@ def test_previously_reported_missing_keys_explicitly_present(bundled_catalogs):
         "dialog.info.alpha_no",
         "dialog.resize.quick_presets",
         "panel.adjustments.compare",
-        "brush.toggle_studio",
     ]
 
     for key in critical_keys:
@@ -116,6 +114,22 @@ def test_previously_reported_missing_keys_explicitly_present(bundled_catalogs):
         assert cat_fa.has(key), f"Key '{key}' missing from Persian catalog"
         assert cat_en.get(key) != "", f"Empty translation for '{key}' in English"
         assert cat_fa.get(key) != "", f"Empty translation for '{key}' in Persian"
+
+
+def test_obsolete_brush_studio_toggle_keys_cleanly_absent(bundled_catalogs):
+    """
+    Confirm obsolete Brush Studio toggle keys are completely purged from both catalogs:
+    Brush Studio has no standalone toggle action/button/key and is contextual to the Brush Tool.
+    """
+    cat_en, cat_fa = bundled_catalogs
+    obsolete_keys = [
+        "brush.toggle_studio",
+        "brush.toggle_studio_desc",
+        "brush.studio_desc",
+    ]
+    for key in obsolete_keys:
+        assert not cat_en.has(key), f"Obsolete key '{key}' unexpectedly present in English catalog"
+        assert not cat_fa.has(key), f"Obsolete key '{key}' unexpectedly present in Persian catalog"
 
 
 # -----------------------------------------------------------------------------
@@ -375,8 +389,8 @@ def test_main_window_toast_keys_present(bundled_catalogs):
 def test_catalog_counting_method_and_parity(repo_root):
     """
     Verify catalog counting definitions:
-    - Top-level translation entry count: 362
-    - Recursively flattened leaf string values: 363 (accounting for plural 'layers.count' with 2 forms)
+    - Top-level translation entry count: 359 (after purging 3 obsolete standalone Brush Studio toggle keys)
+    - Recursively flattened leaf string values: 360 (accounting for plural 'layers.count' with 2 forms)
     - Plural entry count: 1 ('layers.count')
     """
     import json
@@ -388,8 +402,8 @@ def test_catalog_counting_method_and_parity(repo_root):
     with open(fa_path, "r", encoding="utf-8") as f:
         fa_data = json.load(f)["translations"]
 
-    assert len(en_data) == 362, f"Expected 362 top-level EN entries, got {len(en_data)}"
-    assert len(fa_data) == 362, f"Expected 362 top-level FA entries, got {len(fa_data)}"
+    assert len(en_data) == 359, f"Expected 359 top-level EN entries, got {len(en_data)}"
+    assert len(fa_data) == 359, f"Expected 359 top-level FA entries, got {len(fa_data)}"
 
     def count_leaves(obj):
         leaves = {}
@@ -405,6 +419,6 @@ def test_catalog_counting_method_and_parity(repo_root):
     en_leaves = count_leaves(en_data)
     fa_leaves = count_leaves(fa_data)
 
-    assert len(en_leaves) == 363, f"Expected 363 EN leaf strings, got {len(en_leaves)}"
-    assert len(fa_leaves) == 363, f"Expected 363 FA leaf strings, got {len(fa_leaves)}"
+    assert len(en_leaves) == 360, f"Expected 360 EN leaf strings, got {len(en_leaves)}"
+    assert len(fa_leaves) == 360, f"Expected 360 FA leaf strings, got {len(fa_leaves)}"
 

@@ -85,13 +85,20 @@ def test_bug_a_no_standalone_brush_studio_menu_toggle(qapp):
 def test_bug_a_no_stale_action_registry_or_shortcut_entries(qapp):
     """
     Verify ActionRegistry and ShortcutManager do not expose removed standalone toggles:
-    - 'brush.toggle_studio' is NOT registered
-    - 'view.toggle_brush' is NOT registered
-    - 'brush.activate' remains registered as the single authoritative Brush entry point
+    - 'brush.toggle_studio' is NOT in ActionRegistry or ShortcutManager
+    - 'view.toggle_brush' is NOT in ActionRegistry or ShortcutManager
+    - 'brush_studio' and 'view_brush' are NOT in aliases or ShortcutManager
+    - No definition in ShortcutManager has key sequence 'F9' (standalone F9 is completely absent)
+    - 'Shift+F9' is strictly reserved for 'brush_reset_settings'
+    - 'brush.activate' / 'tool_brush' remains registered as the single authoritative Brush entry point ('B')
     """
+    # 1. ActionRegistry checks
     reg = get_action_registry()
     assert "brush.toggle_studio" not in reg
     assert "view.toggle_brush" not in reg
+    assert "brush_studio" not in reg
+    assert "brush_studio" not in reg._aliases
+    assert "view_brush" not in reg._aliases
     assert "brush.activate" in reg
 
     act_brush = reg.get("brush.activate")
@@ -103,6 +110,46 @@ def test_bug_a_no_stale_action_registry_or_shortcut_entries(qapp):
     assert "brush.focus_properties" in reg
     assert "brush.reset_settings" in reg
     assert "brush.cycle_mode" in reg
+
+    # 2. Direct ShortcutManager inspection
+    win = MainWindow()
+    win.show()
+    qapp.processEvents()
+
+    sm = get_shortcut_manager()
+    assert "brush.toggle_studio" not in sm
+    assert "brush_studio" not in sm
+    assert "view.toggle_brush" not in sm
+    assert "view_brush" not in sm
+    assert "toggle_studio" not in sm
+
+    # Inspect all registered shortcut definitions
+    all_defs = sm.get_all()
+    for defn in all_defs:
+        key_seq = (defn.key_sequence or "").strip()
+        # Verify no standalone F9 key binding anywhere
+        assert key_seq.upper() != "F9", (
+            f"Found forbidden standalone F9 shortcut assigned to action '{defn.action_id}': {defn.name}"
+        )
+        if "F9" in key_seq.upper():
+            # Only legitimate Shift+F9 for reset settings is allowed
+            assert key_seq == "Shift+F9", f"Unexpected F9-containing shortcut: {key_seq} on {defn.action_id}"
+            assert defn.action_id == "brush_reset_settings"
+
+        # Verify no definition claims to toggle brush studio
+        lower_name = defn.name.lower()
+        lower_desc = defn.description.lower()
+        assert "toggle brush studio" not in lower_name
+        assert "toggle brush studio" not in lower_desc
+
+    # Verify authoritative brush shortcuts
+    assert sm.get_shortcut_string("tool_brush") == "B"
+    assert sm.get_shortcut_string("brush_reset_settings") == "Shift+F9"
+    assert sm.get_shortcut_string("brush_focus_presets") == "Ctrl+Shift+B"
+    assert sm.get_shortcut_string("brush_focus_properties") == "Alt+B"
+    assert sm.get_shortcut_string("brush_cycle_mode") == "Shift+B"
+
+    win.close()
 
 
 def test_bug_a_brush_tool_auto_reveals_and_hides_dock(qapp):

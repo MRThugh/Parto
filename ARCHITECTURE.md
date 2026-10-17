@@ -226,7 +226,7 @@ To prevent regressions across existing test suites, Parto 2.0 provides compatibi
 
 * `parto.history.commands.SnapshotCommand` is preserved as a fallback checkpoint.
 * Legacy command classes (`LayerAddCommand`, `LayerDeleteCommand`, etc.) continue to exist in `parto.history.commands`.
-* `ShortcutManager` transparently resolves legacy IDs (`file_save`, `edit_undo`, `view_brush`, `brush_studio`) to Architecture 2.0 Action IDs.
+* `ShortcutManager` transparently resolves legacy IDs (`file_save`, `edit_undo`, `tool_brush`, `layer_new`) to Architecture 2.0 Action IDs.
 * `Document._record_operation` and `Document._create_snapshot` remain operational for legacy tests and external callers.
 
 ---
@@ -258,6 +258,12 @@ The final stabilization pass permanently closed all remaining migration bypasses
 5. **Single Authoritative History Source of Truth**:
    * `HistoryManager` is the sole authoritative history manager in Parto. No UI panel, controller, adapter, or tool maintains private undo/redo stacks.
    * Dirty state (`is_clean`, `is_modified`) is strictly maintained across command executions, undos, redos, saves, and atomic transactions.
+
+6. **Brush Studio Contextual Lifecycle & Elimination of Standalone Toggle**:
+   * Brush Studio has no standalone toolbar button, View menu toggle, or F9 shortcut.
+   * Brush Studio is strictly contextual to the Brush Tool (`B`): activating the Brush tool reveals the Brush Studio dock and contextual `&Brush` menu; switching to Move (`V`), Crop (`C`), or Eyedropper (`I`) automatically hides them.
+   * All active brush parameters (tip size, opacity, hardness, palette colors, eraser mode) remain strictly preserved across arbitrary tool switches.
+   * Reset to Defaults is canonically mapped to `Shift+F9` (`brush_reset_settings`), leaving zero standalone `F9` bindings.
 
 ---
 

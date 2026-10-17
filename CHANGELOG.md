@@ -69,7 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Maintained complete undo/redo support across painting, layer operations, crop, resize, rotate, flip, filters, and adjustments without altering user editing workflows.
 - **Contextual Brush Studio Architecture**:
   - Brush Studio is now treated as a contextual Brush feature rather than a global View-menu item.
-  - Dynamically displays a dedicated `&Brush` menu when the Brush Tool is active, exposing Brush Studio (`F9`), preset navigation (`Ctrl+Shift+B`), tip property focus (`Alt+B`), mode cycling (`Shift+B`), defaults reset (`Shift+F9`), and size/hardness adjustments.
+  - Dynamically displays a dedicated `&Brush` menu when the Brush Tool is active, revealing Brush Studio, preset navigation (`Ctrl+Shift+B`), tip property focus (`Alt+B`), mode cycling (`Shift+B`), defaults reset (`Shift+F9`), and size/hardness adjustments.
   - Automatically hides the contextual Brush menu and studio dock when switching to Move, Crop, or Eyedropper tools while strictly preserving all active brush settings (size, opacity, hardness, palette colors, eraser mode).
 
 ### Fixed
@@ -103,7 +103,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `Shift+B`: Cycle between Paint and Eraser mode.
   - `X`: Swap active foreground and background colors.
   - `D`: Reset brush colors to default black and white.
-  - `F9`: Toggle Brush Studio panel.
   - `Shift+F9`: Reset all brush parameters to factory defaults.
   - `Ctrl+Shift+B`: Quick-focus preset search in Brush Studio.
   - `Alt+B`: Quick-focus tip properties in Brush Studio.

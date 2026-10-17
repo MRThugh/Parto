@@ -32,7 +32,7 @@
   - **Full Backward Compatibility**: Seamless re-export shim via `parto/editor/document.py` and `EditorEngine`.
 - **Contextual Brush Studio Architecture**:
   - Context-aware menu integration: Brush Studio is no longer exposed as a static global View menu item.
-  - When the **Brush Tool (`B`)** is selected, a dedicated contextual **Brush menu** (`&Brush`) dynamically appears in the menu bar, exposing Brush Studio (`F9`), preset navigation (`Ctrl+Shift+B`), tip property focus (`Alt+B`), mode cycling (`Shift+B`), defaults reset (`Shift+F9`), and size/hardness controls.
+  - When the **Brush Tool (`B`)** is selected, a dedicated contextual **Brush menu** (`&Brush`) dynamically appears in the menu bar, revealing the Brush Studio dock and providing preset navigation (`Ctrl+Shift+B`), tip property focus (`Alt+B`), mode cycling (`Shift+B`), defaults reset (`Shift+F9`), and size/hardness controls.
   - Navigating to Move, Crop, or Eyedropper tools automatically withdraws the contextual menu and studio dock while strictly preserving all active brush settings (size, opacity, hardness, color palette, eraser mode).
 - **Professional Brush Studio Subsystem (`parto/brush/`, `parto/ui/panels/brush/`)**:
   - Modular studio dock (`BrushStudioDock`) with live-rendered dab preview, current preset summary, and quick action drawer.
@@ -57,7 +57,7 @@
   - Smooth 200ms crossfade animation (`transition_theme`) using `QGraphicsOpacityEffect` and `QPropertyAnimation`.
 - **Localization Core Subsystem (`parto/localization/`, [`docs/LOCALIZATION.md`](docs/LOCALIZATION.md))**:
   - Independent, UI-decoupled internationalization service managing runtime locale switching, catalog discovery, translation fallback chains, and layout direction synchronization.
-  - Bundled factory catalogs for **English** (LTR) and **Persian / فارسی** (RTL), each with 362 top-level translation entries (363 recursively flattened leaf string values) and 100% key parity.
+  - Bundled factory catalogs for **English** (LTR) and **Persian / فارسی** (RTL), each with 359 top-level translation entries (360 recursively flattened leaf string values) and 100% key parity.
   - Dynamic layout direction synchronization updating `QApplication.setLayoutDirection` and top-level windows (`Qt.LeftToRight` $\leftrightarrow$ `Qt.RightToLeft`).
   - Atomic runtime switching: validates candidate catalogs prior to commit, preserving previous valid locale and text direction if candidate validation fails.
   - Duplicate JSON key detection in `LanguageCatalogLoader` preventing silent overwrite, with directory-to-metadata identifier consistency verification.
@@ -248,7 +248,6 @@ Parto features a normalized, zero-conflict shortcut system registered through `S
 | `Shift+B` | Cycle Brush Mode | Toggle between Paint and Eraser mode |
 | `X` | Swap Brush Colors | Swap active foreground and background colors |
 | `D` | Reset Brush Colors | Reset colors to standard default black & white |
-| `F9` | Toggle Brush Studio | Show/hide Brush Studio dock panel |
 | `Shift+F9` | Reset Brush Defaults | Reset all brush parameters to factory defaults |
 | `Ctrl+Shift+B` | Focus Preset Search | Quick-focus search input in Brush Studio |
 | `Alt+B` | Focus Tip Properties | Quick-focus tip properties in Brush Studio |
