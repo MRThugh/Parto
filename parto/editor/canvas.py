@@ -141,8 +141,14 @@ class Canvas(QGraphicsView):
         self.active_tool.activate(self)
         self.viewport().update()
 
+    @property
+    def is_previewing(self) -> bool:
+        """Return True if currently displaying a temporary live adjustment preview."""
+        return getattr(self, "_is_previewing", False)
+
     def update_composite_pixmap(self) -> None:
         """Refresh rendered scene from document composite."""
+        self._is_previewing = False
         comp = self.document.get_composite()
         if comp is None:
             self._scene.clear()
@@ -166,6 +172,7 @@ class Canvas(QGraphicsView):
             self.update_composite_pixmap()
             return
 
+        self._is_previewing = True
         pix = pil_to_qpixmap(image)
         if self._pixmap_item is None:
             self._scene.clear()
@@ -234,6 +241,9 @@ class Canvas(QGraphicsView):
         event.accept()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
+        if getattr(self, "_is_previewing", False) and not self.crop_mode:
+            self.update_composite_pixmap()
+
         pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
         scene_pos = self.mapToScene(pos)
 

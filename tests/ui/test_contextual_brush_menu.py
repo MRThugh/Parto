@@ -58,7 +58,8 @@ def test_contextual_brush_menu_tool_lifecycle(qapp):
     qapp.processEvents()
     assert win.brush_menu.menuAction().isVisible() is True
     assert win.brush_dock.isVisible() is True
-    assert win.act_brush_studio.isChecked() is True
+    assert not hasattr(win, "act_brush_studio")
+    assert not hasattr(win.toolbar, "act_brush_panel")
 
     # 3. Switch to Move Tool: Brush menu and Brush dock hide
     win.action_tool_move()

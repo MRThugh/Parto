@@ -109,15 +109,34 @@ class AdjustmentDock(QDockWidget):
 
         return lbl, slider, val_lbl
 
+    @staticmethod
+    def slider_to_factor(val: int) -> float:
+        """
+        Convert slider position [-100, 100] to multiplicative adjustment factor [0.0, 2.0].
+        Neutral (0%) maps to factor 1.0 (no change).
+        -100% maps to factor 0.0 (total reduction).
+        +100% maps to factor 2.0 (2x enhancement).
+        """
+        return max(0.0, 1.0 + (val / 100.0))
+
+    @staticmethod
+    def factor_to_slider(factor: float) -> int:
+        """Inverse conversion from factor [0.0, 2.0] to slider position [-100, 100]."""
+        return max(-100, min(100, int(round((factor - 1.0) * 100.0))))
+
+    def _get_factors(self) -> tuple[float, float, float, float]:
+        b = self.slider_to_factor(self.b_slider.value())
+        c = self.slider_to_factor(self.c_slider.value())
+        s = self.slider_to_factor(self.s_slider.value())
+        sh = self.slider_to_factor(self.sh_slider.value())
+        return b, c, s, sh
+
     def _on_slider_changed(self, val: int, label: QLabel):
-        label.setText(f"{val}%")
+        label.setText(f"{val:+d}%" if val != 0 else "0%")
         self._emit_preview()
 
     def _emit_preview(self):
-        b = self.b_slider.value() / 100.0
-        c = self.c_slider.value() / 100.0
-        s = self.s_slider.value() / 100.0
-        sh = self.sh_slider.value() / 100.0
+        b, c, s, sh = self._get_factors()
         self.preview_requested.emit(b, c, s, sh)
 
     def _on_compare_pressed(self):
@@ -127,21 +146,25 @@ class AdjustmentDock(QDockWidget):
         self._emit_preview()
 
     def _on_apply(self):
-        b = self.b_slider.value() / 100.0
-        c = self.c_slider.value() / 100.0
-        s = self.s_slider.value() / 100.0
-        sh = self.sh_slider.value() / 100.0
+        b, c, s, sh = self._get_factors()
         self.adjustments_applied.emit(b, c, s, sh)
+        self._reset_sliders_internal()
 
-    def reset_all(self):
-        for s in (self.b_slider, self.c_slider, self.s_slider, self.sh_slider):
-            s.blockSignals(True)
-            s.setValue(0)
-            s.blockSignals(False)
+    def _reset_sliders_internal(self):
+        for sld in (self.b_slider, self.c_slider, self.s_slider, self.sh_slider):
+            sld.blockSignals(True)
+            sld.setValue(0)
+            sld.blockSignals(False)
 
         for l in (self.b_val_label, self.c_val_label, self.s_val_label, self.sh_val_label):
             l.setText("0%")
 
+    def reset_all(self):
+        self._reset_sliders_internal()
+        self.reset_preview_requested.emit()
+
+    def hideEvent(self, event: Any):
+        super().hideEvent(event)
         self.reset_preview_requested.emit()
 
     def retranslate_ui(self):

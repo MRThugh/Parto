@@ -38,7 +38,6 @@ TOOLBAR_ACTION_KEYS = {
     "flip_v": "action.image.flip_v",
     "layers": "action.view.layers",
     "adjust": "action.view.adjustments",
-    "brush_panel": "brush.studio",
 }
 
 

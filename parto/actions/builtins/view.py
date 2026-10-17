@@ -31,14 +31,4 @@ def create_view_actions() -> List[Action]:
             checkable=True,
             handler=lambda ctx: ctx.window.toggle_adjustments_dock() if ctx.window else None,
         ),
-        Action(
-            id="view.toggle_brush",
-            name="Brush Studio",
-            description="Toggle Brush Studio Panel visibility",
-            category=ActionCategory.VIEW,
-            default_shortcut="F9",
-            icon_name="brush",
-            checkable=True,
-            handler=lambda ctx: ctx.window.toggle_brush_dock() if ctx.window else None,
-        ),
     ]

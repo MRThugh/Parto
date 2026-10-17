@@ -206,19 +206,15 @@ class MainWindow(QMainWindow):
 
     def toggle_brush_dock(self, animate: bool = True):
         if not self.brush_dock.isVisible():
-            if not self.tb_tool_brush.isChecked():
-                self.action_tool_brush()
-            else:
-                self.brush_animator.show_dock(animate=animate)
+            self.action_tool_brush()
         else:
             self.brush_animator.hide_dock(animate=animate)
 
     def set_brush_dock_visible(self, visible: bool, animate: bool = True):
-        self.brush_animator.set_visible(visible, animate=animate)
-        sm = get_shortcut_manager()
-        defn = sm.get("brush_studio") or sm.get("view_brush")
-        if defn and defn.action:
-            defn.action.setChecked(visible)
+        if visible and not self.tb_tool_brush.isChecked():
+            self.action_tool_brush()
+        else:
+            self.brush_animator.set_visible(visible, animate=animate)
 
     def set_layers_dock_visible(self, visible: bool, animate: bool = True):
         self.layers_animator.set_visible(visible, animate=animate)
@@ -275,7 +271,6 @@ class MainWindow(QMainWindow):
         # Docks
         self.toolbar.act_layers_panel = self.toolbar.register_action("layers", "Layers Panel (F7)", "layers")
         self.toolbar.act_adjustments_panel = self.toolbar.register_action("adjust", "Adjustments (F8)", "adjust")
-        self.toolbar.act_brush_panel = self.toolbar.register_action("brush_panel", "Brush Studio (F9)", "brush")
 
         # Retain references for tests and tool switches
         self.tb_tool_move = self.toolbar.act_tool_move
@@ -309,7 +304,6 @@ class MainWindow(QMainWindow):
 
         self.toolbar.act_layers_panel.triggered.connect(self.toggle_layers_dock)
         self.toolbar.act_adjustments_panel.triggered.connect(self.toggle_adjustments_dock)
-        self.toolbar.act_brush_panel.triggered.connect(self.toggle_brush_dock)
 
     def _init_statusbar(self):
         """Construct bottom statusbar showing coordinates, RGB, and zoom."""
@@ -761,12 +755,8 @@ class MainWindow(QMainWindow):
             self.canvas.show_preview_image(preview_comp)
 
     def _on_reset_preview_adjustments(self):
-        """Display actual unadjusted composite when comparing original."""
-        comp = self.document.get_composite()
-        if comp:
-            self.canvas.show_preview_image(comp)
-        else:
-            self.canvas.update_composite_pixmap()
+        """Display actual unadjusted composite when comparing original or resetting."""
+        self.canvas.update_composite_pixmap()
 
     # Filters
     def action_show_filter_gallery(self):

@@ -300,35 +300,6 @@ class EditorMenuBar:
         brush_menu = menu_bar.addMenu(t("menu.brush"))
         window.brush_menu = brush_menu
 
-        act_tbrush_studio = sm.register(
-            "brush_studio",
-            t("brush.studio"),
-            "Brush",
-            "F9",
-            t("brush.studio_desc"),
-            brush_menu.addAction(t("brush.studio")),
-        )
-        act_tbrush_studio.action.setCheckable(True)
-        act_tbrush_studio.action.setChecked(window.brush_dock.isVisible() if hasattr(window, "brush_dock") else False)
-        if hasattr(window, "set_brush_dock_visible"):
-            act_tbrush_studio.action.toggled.connect(lambda checked: window.set_brush_dock_visible(checked, animate=True))
-        elif hasattr(window, "brush_dock"):
-            act_tbrush_studio.action.toggled.connect(window.brush_dock.setVisible)
-
-        window.act_brush_studio = act_tbrush_studio.action
-
-        def _sync_brush_action(vis: bool):
-            try:
-                action = act_tbrush_studio.action
-                if action is not None and action.isChecked() != vis:
-                    action.blockSignals(True)
-                    action.setChecked(vis)
-                    action.blockSignals(False)
-            except (RuntimeError, AttributeError):
-                pass
-
-        if hasattr(window, "brush_dock"):
-            window.brush_dock.visibilityChanged.connect(_sync_brush_action)
 
         act_bfocus_presets_action = brush_menu.addAction(t("brush.presets"))
         act_bfocus_presets_action.triggered.connect(getattr(window, "action_focus_brush_presets", lambda: None))
@@ -565,7 +536,6 @@ class EditorMenuBar:
         _update_act("act_tool_eyedropper_menu", "tool_eyedropper", "tool.eyedropper", "tool.eyedropper_desc")
 
         # Brush
-        _update_act("act_brush_studio", "brush_studio", "brush.studio", "brush.studio_desc")
         _update_act("act_bfocus_presets", "brush_focus_presets", "brush.presets", "brush.presets_desc")
         _update_act("act_bfocus_props", "brush_focus_properties", "brush.properties", "brush.properties_desc")
         _update_act("act_breset", "brush_reset_settings", "brush.reset", "brush.reset_desc")

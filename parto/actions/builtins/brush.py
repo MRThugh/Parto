@@ -22,16 +22,6 @@ def create_brush_actions() -> List[Action]:
             handler=lambda ctx: ctx.window.action_tool_brush() if ctx.window else None,
         ),
         Action(
-            id="brush.toggle_studio",
-            name="Brush Studio",
-            description="Toggle Brush Studio panel",
-            category=ActionCategory.BRUSH,
-            default_shortcut="F9",
-            icon_name="brush",
-            checkable=True,
-            handler=lambda ctx: ctx.window.toggle_brush_dock() if ctx.window else None,
-        ),
-        Action(
             id="brush.focus_presets",
             name="Focus Presets",
             description="Focus preset browser in Brush Studio",

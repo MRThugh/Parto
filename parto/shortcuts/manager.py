@@ -58,8 +58,6 @@ class ShortcutManager:
 
     def _canonical_id(self, action_id: str) -> str:
         """Return canonical Action ID from ActionRegistry if available."""
-        if action_id == "view_brush":
-            return "brush.toggle_studio"
         try:
             from ..actions.registry import get_action_registry
             reg = get_action_registry()
@@ -71,8 +69,6 @@ class ShortcutManager:
         """Resolve legacy or aliased action IDs using ActionRegistry if available."""
         if action_id in self._shortcuts:
             return action_id
-        if action_id == "view_brush" and "brush_studio" in self._shortcuts:
-            return "brush_studio"
         try:
             from ..actions.registry import get_action_registry
             reg = get_action_registry()

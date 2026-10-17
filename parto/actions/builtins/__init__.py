@@ -62,8 +62,6 @@ def register_all_builtins(registry: ActionRegistry) -> None:
         "view_fullscreen": "app.toggle_fullscreen",
         "view_layers": "view.toggle_layers",
         "view_adjustments": "view.toggle_adjustments",
-        "view_brush": "brush.toggle_studio",
-        "brush_studio": "brush.toggle_studio",
         "img_rot_cw": "transform.rotate_cw",
         "img_rot_ccw": "transform.rotate_ccw",
         "img_rot_180": "transform.rotate_180",
