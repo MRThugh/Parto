@@ -337,6 +337,7 @@
     "status.dimensions": "{width} × {height} پیکسل  ({aspect_ratio}، {megapixels})",
     "status.no_image": "بدون تصویر",
     "status.ready": "آماده",
+    "status.rgb_empty": "RGB: —",
     "toast.adjustments_applied": "تنظیمات رنگ بر روی لایه فعال اعمال شد",
     "toast.applied_filter": "فیلتر {filter} اعمال شد",
     "toast.bg_removed": "پس‌زمینه حذف شد",

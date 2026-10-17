@@ -15,10 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Defined explicit settings persistence failure contract: default resilient mode (`strict_persistence=False`) treats persistence failure as a non-fatal side effect while exposing `last_persistence_succeeded` and `last_persistence_error`; strict mode (`strict_persistence=True`) enforces atomic rollback.
   - Implemented subscriber isolation for Qt signals and headless observer callbacks, tracking errors in `last_listener_failures` and `last_refresh_completed` without aborting other listeners.
   - Added UI refresh subscriber isolation in `MainWindow._on_locale_changed` preventing single-widget failures from corrupting application retranslation.
-  - Added `toast.language_switched_not_saved` translation key to both English and Persian catalogs (191 verified keys each).
-  - Added comprehensive failure-path unit tests to `tests/unit/test_localization_core.py` covering invalid locale IDs, missing catalogs, malformed catalogs, persistence failures, subscriber isolation, and idempotent no-ops.
-  - Added end-to-end integration test suite `tests/integration/test_locale_state_preservation.py` verifying byte-for-byte preservation of document identity, dirty modification flag, layer stacks, undo/redo history, brush settings, active tools, zoom factors, and themes across language switches.
-  - Created comprehensive standalone developer guide `docs/LOCALIZATION.md` documenting architecture, schemas, extension workflows, and future Intent integration.
+  - Added duplicate JSON key detection in `LanguageCatalogLoader` preventing silent overwrite of duplicated keys during file and string catalog parsing.
+  - Added catalog directory and metadata identifier consistency verification during catalog discovery and file loading.
+  - Closed Phase 1 UI localization gaps: localized status bar empty color indicator (`status.rgb_empty`) and connected all `MainWindow` toast messages to translation catalog keys (expanding catalogs to 362 top-level entries, 363 leaf string values each with 100% parity).
+  - Added comprehensive unit tests in `tests/unit/test_localization_core.py` (29 tests) covering invalid locale IDs, missing catalogs, malformed catalogs, duplicate JSON key rejection, directory-metadata consistency, persistence failures, subscriber isolation, and idempotent no-ops.
+  - Added catalog validation and parity suite in `tests/unit/test_localization_validation.py` (23 tests) verifying codebase key coverage, exact key parity, placeholder compatibility, and multilingual CLDR rules.
+  - Added end-to-end integration test suite `tests/integration/test_locale_state_preservation.py` (3 tests) verifying byte-for-byte preservation of document identity, dirty modification flag, layer stacks, undo/redo history, brush settings, active tools, zoom factors, and themes across unidirectional and bidirectional roundtrip language switches.
+  - Created comprehensive standalone developer guide `docs/LOCALIZATION.md` documenting architecture, schemas, extension workflows, counting definitions, and future Intent integration.
 
 - **Action + Command + History Architecture 2.0 Finalization**:
   - Closed all remaining architectural bypasses and legacy snapshot execution paths across UI, Brush, and Transform domains.
@@ -27,8 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Documentation Audit & Release-Readiness Consistency**:
   - Aligned project documentation (`README.md`, `ARCHITECTURE.md`, `tests/README.md`, `docs/LOCALIZATION.md`, and `parto/brush/README.md`) to clearly distinguish the active `v0.4.0` development release line from the currently declared `0.3.1` package version.
-  - Reconciled release status statements: replaced unsupported "Production Ready" and global "FINALIZED" labels with evidence-based status (26 Localization Core unit tests passing; Qt-dependent integration test verification pending in environments lacking PySide6).
-  - Clarified test categorization across existing test files (44 files / 357 cases), passing CI tests, pure-Python unit tests, and tests blocked in minimal environments without PySide6.
+  - Reconciled release status statements: verified evidence-based status (55 Localization tests passing: 29 core unit tests, 23 validation/parity tests, 3 Qt state preservation integration tests; 384 tests passing repository-wide).
+  - Clarified test categorization across existing test files (44 files / 384 cases), passing CI tests, pure-Python unit tests, and tests in headless Qt environments.
   - Updated Brush documentation in `parto/brush/README.md` to reflect Architecture 2.0 `PaintStrokeCommand` memory isolation.
 - **Layers Panel Opacity Workflow**:
   - Replaced legacy `create_snapshot()` and `record_operation()` calls with authoritative `ChangeLayerOpacityCommand` routed through `HistoryManager.execute()`.

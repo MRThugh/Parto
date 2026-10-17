@@ -598,3 +598,75 @@ def test_previous_locale_remains_usable_after_failed_switch(clean_manager):
     assert clean_manager.direction == TextDirection.RTL
     assert clean_manager.translate("menu.file") == "پرونده"
 
+
+def test_duplicate_json_key_rejection(temp_catalog_dir):
+    """Catalog files containing duplicate JSON keys must be rejected before silent overwrite."""
+    dup_file = os.path.join(temp_catalog_dir, "duplicate_keys.json")
+    # Raw JSON with duplicate "app.name" key
+    raw_json = """{
+      "schema_version": "1.0.0",
+      "metadata": {
+        "id": "de",
+        "name": "German",
+        "native_name": "Deutsch",
+        "direction": "ltr"
+      },
+      "translations": {
+        "app.name": "Parto Original",
+        "app.name": "Parto Overwritten",
+        "menu.file": "Datei"
+      }
+    }"""
+    with open(dup_file, "w", encoding="utf-8") as f:
+        f.write(raw_json)
+
+    cat, err = LanguageCatalogLoader.load_from_file(dup_file)
+    assert cat is None
+    assert err is not None
+    assert "Duplicate" in err
+    assert "app.name" in err
+
+
+def test_loader_load_from_string_duplicate_detection():
+    """LanguageCatalogLoader.load_from_string must detect and reject duplicate keys."""
+    raw_json = """{
+      "schema_version": "1.0.0",
+      "metadata": {
+        "id": "fr",
+        "name": "French",
+        "native_name": "Français"
+      },
+      "translations": {
+        "test.key": "First Value",
+        "test.key": "Duplicate Value"
+      }
+    }"""
+    cat, err = LanguageCatalogLoader.load_from_string(raw_json)
+    assert cat is None
+    assert err is not None
+    assert "Duplicate" in err
+
+
+def test_directory_metadata_consistency(temp_catalog_dir):
+    """Loader must reject or report mismatch when directory locale differs from metadata id."""
+    mismatch_dir = os.path.join(temp_catalog_dir, "es")
+    os.makedirs(mismatch_dir, exist_ok=True)
+    mismatch_file = os.path.join(mismatch_dir, "locale.json")
+    with open(mismatch_file, "w", encoding="utf-8") as f:
+        json.dump({
+            "schema_version": "1.0.0",
+            "metadata": {
+                "id": "it",  # Declares 'it' while directory is 'es'
+                "name": "Italian",
+                "native_name": "Italiano"
+            },
+            "translations": {
+                "app.name": "Parto"
+            }
+        }, f)
+
+    cat, err = LanguageCatalogLoader.load_from_file(mismatch_file, expected_locale_id="es")
+    assert cat is None
+    assert err is not None
+    assert "mismatch" in err.lower()
+

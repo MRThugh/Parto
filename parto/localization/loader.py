@@ -27,6 +27,15 @@ logger = logging.getLogger("parto.localization.loader")
 VALID_PLURAL_CATEGORIES = {"zero", "one", "two", "few", "many", "other"}
 
 
+def _detect_duplicate_json_keys(pairs: List[Tuple[str, Any]]) -> Dict[str, Any]:
+    res: Dict[str, Any] = {}
+    for k, v in pairs:
+        if k in res:
+            raise ValueError(f"Duplicate JSON key detected: '{k}'")
+        res[k] = v
+    return res
+
+
 class LanguageCatalogLoader:
     """
     Dedicated loader and validator for language catalog JSON files.
@@ -34,6 +43,7 @@ class LanguageCatalogLoader:
     Guarantees:
     - Pure data loading: never executes Python code from packs.
     - Strict validation of schema versions, identifiers, types, and placeholders.
+    - Duplicate JSON keys are detected and rejected before silent overwrite.
     - Corrupted or malformed catalogs are rejected safely with clear diagnostics.
     - Path traversal defense and automatic catalog discovery across standard resource directories.
     """
@@ -140,9 +150,42 @@ class LanguageCatalogLoader:
             return None, f"Failed to construct TranslationCatalog: {e}"
 
     @classmethod
+    def load_from_string(
+        cls,
+        content: str,
+        filepath: Optional[str] = None,
+        expected_locale_id: Optional[str] = None,
+    ) -> Tuple[Optional[TranslationCatalog], Optional[str]]:
+        """
+        Safely parse, detect duplicate keys, and validate a catalog from a JSON string.
+        Returns (catalog, None) on success, (None, error_str) on failure.
+        """
+        try:
+            data = json.loads(content, object_pairs_hook=_detect_duplicate_json_keys)
+        except json.JSONDecodeError as e:
+            line_info = f" at line {e.lineno}, col {e.colno}" if hasattr(e, "lineno") else ""
+            return None, f"Malformed JSON{line_info}: {e.msg}"
+        except ValueError as e:
+            return None, f"Duplicate key error: {e}"
+
+        if expected_locale_id and is_valid_locale_id(expected_locale_id):
+            metadata_dict = data.get("metadata") if isinstance(data, dict) else None
+            if isinstance(metadata_dict, dict):
+                cat_id = metadata_dict.get("id", "")
+                if is_valid_locale_id(cat_id):
+                    if canonicalize_locale_id(expected_locale_id) != canonicalize_locale_id(cat_id):
+                        return None, (
+                            f"Directory/file locale mismatch: expected '{expected_locale_id}', "
+                            f"but catalog metadata declares id '{cat_id}'"
+                        )
+
+        return cls.load_from_dict(data, filepath=filepath)
+
+    @classmethod
     def load_from_file(
         cls,
         filepath: str,
+        expected_locale_id: Optional[str] = None,
     ) -> Tuple[Optional[TranslationCatalog], Optional[str]]:
         """
         Safely read, parse, and validate a catalog from disk.
@@ -159,12 +202,11 @@ class LanguageCatalogLoader:
         except OSError as e:
             return None, f"I/O error reading '{filepath}': {e}"
 
-        try:
-            data = json.loads(content)
-        except json.JSONDecodeError as e:
-            return None, f"Malformed JSON in '{filepath}' at line {e.lineno}, col {e.colno}: {e.msg}"
-
-        catalog, err = cls.load_from_dict(data, filepath=filepath)
+        catalog, err = cls.load_from_string(
+            content,
+            filepath=filepath,
+            expected_locale_id=expected_locale_id,
+        )
         if err:
             logger.warning(f"Catalog validation failed for '{filepath}': {err}")
         return catalog, err
@@ -216,7 +258,8 @@ class LanguageCatalogLoader:
                 if os.path.isdir(full_path):
                     candidate_file = os.path.abspath(os.path.join(full_path, "locale.json"))
                     if os.path.isfile(candidate_file):
-                        cat, err = cls.load_from_file(candidate_file)
+                        expected_id = entry if is_valid_locale_id(entry) else None
+                        cat, err = cls.load_from_file(candidate_file, expected_locale_id=expected_id)
                         if cat:
                             norm_id = canonicalize_locale_id(cat.id) if is_valid_locale_id(cat.id) else cat.id
                             if norm_id in discovered:
@@ -231,7 +274,9 @@ class LanguageCatalogLoader:
 
                 # Flat structure: <dir>/<locale>.json
                 elif os.path.isfile(full_path) and entry.lower().endswith(".json") and entry.lower() != "package.json":
-                    cat, err = cls.load_from_file(full_path)
+                    stem = entry[:-5]
+                    expected_id = stem if is_valid_locale_id(stem) else None
+                    cat, err = cls.load_from_file(full_path, expected_locale_id=expected_id)
                     if cat:
                         norm_id = canonicalize_locale_id(cat.id) if is_valid_locale_id(cat.id) else cat.id
                         if norm_id in discovered:

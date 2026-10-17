@@ -183,3 +183,86 @@ def test_editor_state_preservation_across_failed_locale_switch(qapp):
 
     win.document._state.is_modified = False
     win.close()
+
+
+def test_editor_state_preservation_bidirectional_roundtrip(qapp):
+    """
+    Verifies that a bidirectional roundtrip locale switch (EN -> FA -> EN)
+    preserves all domain, document, layer, tool, and history states,
+    and cleanly restores LTR layout direction, window title, and menu labels.
+    """
+    lm = get_localization_manager()
+    lm.set_locale("en", persist=False)
+
+    win = MainWindow()
+    win.document.new_document(400, 300, fill_color=(200, 200, 200, 255))
+    doc_ref = win.document
+
+    # Add layers
+    win.document.add_layer(name="Base Detail", image=Image.new("RGBA", (400, 300), (0, 0, 255, 200)))
+    win.document.add_layer(name="Overlay Detail", image=Image.new("RGBA", (400, 300), (255, 255, 0, 150)))
+    win.document.set_layer_opacity(1, 0.60)
+    win.document.set_active_layer_index(1)
+    win.document._state.is_modified = True
+
+    # Setup brush tool and parameters
+    win.action_tool_brush()
+    win.tool_brush.set_size(32)
+    win.tool_brush.set_opacity(0.70)
+    win.tool_brush.set_hardness(0.50)
+    win.tool_brush.set_color((120, 20, 80, 255))
+
+    # Zoom
+    win.canvas.zoom_in()
+    initial_zoom = win.canvas.zoom_factor
+
+    # Statusbar checks
+    assert win.statusbar.color_label.text() == "RGB: —"
+
+    # Pre-switch state
+    doc_id = id(win.document)
+    layer_count = len(win.document.layers)
+    layer_names = [l.name for l in win.document.layers]
+
+    # --- Step 1: Switch EN -> FA ---
+    res_fa = lm.set_locale("fa", persist=False)
+    assert res_fa is True
+    assert lm.current_locale == "fa"
+    assert lm.is_rtl is True
+    assert win.layoutDirection() == Qt.RightToLeft
+    assert win.menu_file.title() == "پرونده"
+    assert win.statusbar.color_label.text() == "RGB: —"
+
+    # Undo in Persian
+    assert win.document.undo() is True
+    assert win.document.history.can_redo is True
+
+    # --- Step 2: Switch FA -> EN (Roundtrip) ---
+    res_en = lm.set_locale("en", persist=False)
+    assert res_en is True
+    assert lm.current_locale == "en"
+    assert lm.is_rtl is False
+    assert win.layoutDirection() == Qt.LeftToRight
+    assert win.menu_file.title() == "&File"
+    assert win.statusbar.color_label.text() == "RGB: —"
+
+    # Redo in English
+    assert win.document.redo() is True
+
+    # Verify complete state preservation
+    assert id(win.document) == doc_id
+    assert win.document is doc_ref
+    assert win.document.is_modified is True
+    assert win.document.width == 400
+    assert win.document.height == 300
+    assert len(win.document.layers) == layer_count
+    assert [l.name for l in win.document.layers] == layer_names
+    assert win.canvas.active_tool is win.tool_brush
+    assert win.tool_brush.size == 32
+    assert win.tool_brush.opacity == 0.70
+    assert win.tool_brush.hardness == 0.50
+    assert win.tool_brush.color == (120, 20, 80, 255)
+    assert win.canvas.zoom_factor == initial_zoom
+
+    win.document._state.is_modified = False
+    win.close()

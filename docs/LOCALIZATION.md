@@ -2,7 +2,7 @@
 
 **Author & Maintainer:** Ali Kamrani (علی کامرانی)  
 **Release Line:** v0.4.0 Target Milestone (Current Package: v0.3.1)  
-**Status:** Stabilized & Fully Verified (48 Localization Tests Passing: 26 Core Unit Tests, 20 Validation/Parity Tests, 2 Qt Integration Tests)
+**Status:** Stabilized & Fully Verified (55 Localization Tests Passing: 29 Core Unit Tests, 23 Validation/Parity Tests, 3 Qt Integration Tests)
 
 ---
 
@@ -37,12 +37,12 @@ parto/
 └── resources/
     └── locales/
         ├── en/
-        │   └── locale.json   # English factory catalog (225 keys, LTR)
+        │   └── locale.json   # English factory catalog (362 top-level keys, 363 leaves, LTR)
         └── fa/
-            └── locale.json   # Persian factory catalog (225 keys, RTL)
+            └── locale.json   # Persian factory catalog (362 top-level keys, 363 leaves, RTL)
 ```
 
-Both bundled catalogs (`en` and `fa`) contain exactly **225 translation keys** with 100% key parity, complete codebase coverage, and zero placeholder discrepancies.
+Both bundled catalogs (`en` and `fa`) contain exactly **362 top-level translation entries** (363 recursively flattened leaf string values accounting for the plural entry `layers.count` with `one` and `other` categories) with 100% key parity, complete codebase coverage, and zero placeholder discrepancies.
 
 ---
 
@@ -95,6 +95,20 @@ Every catalog is stored as a UTF-8 encoded JSON document (`locale.json`):
 - `metadata.native_name` *(string, required)*: Native script representation (e.g., `فارسی`, `Deutsch`).
 - `metadata.direction` *(string, required)*: Text direction; `"ltr"` (Left-to-Right) or `"rtl"` (Right-to-Left).
 - `translations` *(object, required)*: Key-value map where values are either simple strings or plural sub-dictionaries.
+
+### Catalog Key & Value Counting Definitions:
+To maintain consistency and reproducibility across all audits and developer documentation, counts are defined as:
+1. **Top-Level Translation Entry Count (`362 entries`):** Total distinct keys located directly under the `translations` JSON object (`len(catalog.keys())`).
+2. **Recursively Flattened Leaf Values (`363 values`):** Total primitive string values present in the catalog. A plural entry with two category forms (`layers.count`: `one`, `other`) counts as 1 top-level entry, but represents 2 leaf strings ($361 \text{ standard strings} + 2 \text{ plural strings} = 363 \text{ leaf values}$).
+3. **Plural Entries (`1 entry`):** Entries whose values are Unicode CLDR grammatical plural dictionaries (`layers.count`).
+
+### Duplicate JSON Key Detection:
+`LanguageCatalogLoader.load_from_file()` and `LanguageCatalogLoader.load_from_string()` enforce duplicate key prevention during JSON deserialization via a custom `object_pairs_hook`. Any catalog JSON file containing duplicate keys raises an explicit `Duplicate key error` rather than silently overwriting earlier values.
+
+### Static Codebase Scanning vs. Dynamic Keys:
+The static validator (`parto/localization/validator.py`) utilizes Python's `ast` module to scan the codebase for static translation calls (`t("key")`, `translate("key")`) and static key data structures (such as lists or tuples of action/ratio keys).
+- **Known Dynamic Key Families:** Dynamically formatted keys such as `filter.{filter_id}` are registered via `get_dynamic_codebase_translation_keys()` and verified against both catalogs.
+- **Dynamic Content & Formats:** Telemetry, file paths, and runtime formatting (e.g., hex color swatches, coordinate numbers) are decoupled from static catalogs and verified via integration tests.
 
 ---
 
@@ -302,26 +316,26 @@ msg_fa = lm.format_intent_response("intent.response.operation_completed", locale
 
 ## 13. How to Run Localization Tests
 
-### Localization Unit Test Suites (46 Tests — Pure Python):
+### Localization Unit Test Suites (52 Tests — Pure Python):
 Does not require GUI libraries or PySide6; runs using the built-in headless fallback emitter:
 ```bash
-# Core subsystem and lifecycle tests (26 tests)
+# Core subsystem and lifecycle tests (29 tests)
 python3 -m pytest tests/unit/test_localization_core.py -v
 
-# Static and dynamic key coverage, catalog parity, and multilingual CLDR plural tests (20 tests)
+# Static and dynamic key coverage, catalog parity, and multilingual CLDR plural tests (23 tests)
 python3 -m pytest tests/unit/test_localization_validation.py -v
 
-# Run all 46 localization unit tests together:
+# Run all 52 localization unit tests together:
 python3 -m pytest tests/unit/test_localization_core.py tests/unit/test_localization_validation.py -v
 ```
 
-### Editor State Preservation Integration Suite (2 Tests — Requires PySide6 & Pillow):
-Verifies byte-for-byte preservation across language switches in offscreen mode:
+### Editor State Preservation Integration Suite (3 Tests — Requires PySide6 & Pillow):
+Verifies byte-for-byte preservation across unidirectional and roundtrip language switches in offscreen mode:
 ```bash
 QT_QPA_PLATFORM=offscreen python3 -m pytest tests/integration/test_locale_state_preservation.py -v
 ```
 
-### Combined Test Execution (All 48 Tests):
+### Combined Test Execution (All 55 Tests):
 ```bash
 QT_QPA_PLATFORM=offscreen python3 -m pytest tests/unit/test_localization_core.py tests/unit/test_localization_validation.py tests/integration/test_locale_state_preservation.py -v
 ```

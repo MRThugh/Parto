@@ -618,11 +618,11 @@ class MainWindow(QMainWindow):
     # Edit & History Actions
     def action_undo(self):
         if self.document.history.undo():
-            self.toast.show_message("Undone")
+            self.toast.show_message(t("toast.undone", default="Undone"))
 
     def action_redo(self):
         if self.document.history.redo():
-            self.toast.show_message("Redone")
+            self.toast.show_message(t("toast.redone", default="Redone"))
 
     def action_resize_image(self):
         if not self.document.has_image:
@@ -659,7 +659,7 @@ class MainWindow(QMainWindow):
         self.crop_bar.set_dimension_text(f"{self.document.width} × {self.document.height} px")
         self.canvas.set_tool(self.tool_crop)
         self.tb_tool_crop.setChecked(True)
-        self.toast.show_message("Crop Tool active — Drag handles, Enter to apply, Esc to cancel")
+        self.toast.show_message(t("toast.crop_active", default="Crop Tool active — Drag handles, Enter to apply, Esc to cancel"))
 
     def apply_crop(self):
         if not self.document.has_image:
@@ -672,7 +672,7 @@ class MainWindow(QMainWindow):
 
     def cancel_crop(self):
         self.action_tool_move()
-        self.toast.show_message("Crop cancelled")
+        self.toast.show_message(t("toast.crop_cancelled", default="Crop cancelled"))
 
     def action_tool_brush(self):
         self.crop_bar.hide()
@@ -688,7 +688,7 @@ class MainWindow(QMainWindow):
         self.brush_bar.set_colors(self.tool_brush.color, self.tool_brush.background_color)
         self.canvas.set_tool(self.tool_brush)
         self.tb_tool_brush.setChecked(True)
-        self.toast.show_message("Brush Tool active — [ / ] resize, X swap, D reset")
+        self.toast.show_message(t("toast.brush_active", default="Brush Tool active — [ / ] resize, X swap, D reset"))
 
     def action_tool_eyedropper(self):
         self.crop_bar.hide()
@@ -699,7 +699,7 @@ class MainWindow(QMainWindow):
             self.brush_menu.menuAction().setVisible(False)
         self.canvas.set_tool(self.tool_eyedropper)
         self.tb_tool_eyedropper.setChecked(True)
-        self.toast.show_message("Eyedropper active — Click pixel to sample color")
+        self.toast.show_message(t("toast.eyedropper_active", default="Eyedropper active — Click pixel to sample color"))
 
     def action_focus_brush_presets(self):
         """Focus presets in Brush Studio (Ctrl+Shift+B)."""
@@ -725,7 +725,7 @@ class MainWindow(QMainWindow):
             self.brush_dock.reset_all_to_defaults()
         elif hasattr(self.tool_brush.settings, "reset_to_defaults"):
             self.tool_brush.settings.reset_to_defaults()
-        self.toast.show_message("Brush settings reset to defaults")
+        self.toast.show_message(t("toast.brush_reset", default="Brush settings reset to defaults"))
 
     def action_cycle_brush_mode(self):
         """Toggle between Paint and Eraser mode (Shift+B)."""
@@ -733,8 +733,8 @@ class MainWindow(QMainWindow):
         self.tool_brush.is_eraser = new_mode
         if hasattr(self, "brush_bar"):
             self.brush_bar._on_settings_updated()
-        mode_label = "Eraser" if new_mode else "Paint"
-        self.toast.show_message(f"Brush Mode: {mode_label}")
+        mode_label = t("brush.mode.eraser", default="Eraser") if new_mode else t("brush.mode.paint", default="Paint")
+        self.toast.show_message(t("toast.brush_mode", mode=mode_label, default=f"Brush Mode: {mode_label}"))
 
     def _on_brush_colors_changed(self, fg: Tuple[int, int, int, int], bg: Tuple[int, int, int, int]):
         self.tool_brush.color = fg
@@ -745,12 +745,13 @@ class MainWindow(QMainWindow):
         if hasattr(self, "brush_bar"):
             self.brush_bar.set_colors(self.tool_brush.color, self.tool_brush.background_color)
         r, g, b, _ = rgba
-        self.toast.show_message(f"Brush color #{r:02X}{g:02X}{b:02X}")
+        hex_val = f"#{r:02X}{g:02X}{b:02X}"
+        self.toast.show_message(t("toast.brush_color", hex=hex_val, default=f"Brush color {hex_val}"))
 
     # Adjustments
     def _on_apply_adjustments(self, b: float, c: float, s: float, sh: float):
         self.document.apply_color_adjustments(b, c, s, sh)
-        self.toast.show_message("Color adjustments applied to active layer")
+        self.toast.show_message(t("toast.adjustments_applied", default="Color adjustments applied to active layer"))
 
     def _on_preview_adjustments(self, b: float, c: float, s: float, sh: float):
         if not self.document.has_image or not self.document.active_layer:

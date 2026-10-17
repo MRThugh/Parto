@@ -337,6 +337,7 @@
     "status.dimensions": "{width} × {height} px  ({aspect_ratio}, {megapixels})",
     "status.no_image": "No Image",
     "status.ready": "Ready",
+    "status.rgb_empty": "RGB: —",
     "toast.adjustments_applied": "Color adjustments applied to active layer",
     "toast.applied_filter": "Applied {filter}",
     "toast.bg_removed": "Background removed",

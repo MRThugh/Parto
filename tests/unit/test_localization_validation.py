@@ -335,3 +335,76 @@ def test_static_scanner_handles_tuples_and_lists(repo_root):
     assert "crop.ratio.square" in codebase_keys_map, "crop.ratio.square was not detected from tuple/list"
     assert "crop.ratio.widescreen" in codebase_keys_map, "crop.ratio.widescreen was not detected from tuple/list"
 
+
+def test_status_rgb_empty_key_present_and_equal(bundled_catalogs):
+    """Verify status.rgb_empty is present in both catalogs and correctly formatted."""
+    cat_en, cat_fa = bundled_catalogs
+    assert cat_en.has("status.rgb_empty")
+    assert cat_fa.has("status.rgb_empty")
+    assert cat_en.get("status.rgb_empty") == "RGB: —"
+    assert cat_fa.get("status.rgb_empty") == "RGB: —"
+
+
+def test_main_window_toast_keys_present(bundled_catalogs):
+    """Verify all toast notification keys used in MainWindow exist in both catalogs."""
+    cat_en, cat_fa = bundled_catalogs
+    toast_keys = [
+        "toast.undone",
+        "toast.redone",
+        "toast.crop_active",
+        "toast.crop_cancelled",
+        "toast.brush_active",
+        "toast.eyedropper_active",
+        "toast.brush_reset",
+        "toast.brush_mode",
+        "toast.brush_color",
+        "toast.adjustments_applied",
+        "toast.image_resized",
+        "toast.canvas_cropped",
+        "toast.canvas_created",
+        "toast.opened",
+        "toast.saved",
+        "toast.language_switched",
+        "toast.language_switched_not_saved",
+    ]
+    for tk in toast_keys:
+        assert cat_en.has(tk), f"Toast key '{tk}' missing in English catalog"
+        assert cat_fa.has(tk), f"Toast key '{tk}' missing in Persian catalog"
+
+
+def test_catalog_counting_method_and_parity(repo_root):
+    """
+    Verify catalog counting definitions:
+    - Top-level translation entry count: 362
+    - Recursively flattened leaf string values: 363 (accounting for plural 'layers.count' with 2 forms)
+    - Plural entry count: 1 ('layers.count')
+    """
+    import json
+    en_path = os.path.join(repo_root, "parto", "resources", "locales", "en", "locale.json")
+    fa_path = os.path.join(repo_root, "parto", "resources", "locales", "fa", "locale.json")
+
+    with open(en_path, "r", encoding="utf-8") as f:
+        en_data = json.load(f)["translations"]
+    with open(fa_path, "r", encoding="utf-8") as f:
+        fa_data = json.load(f)["translations"]
+
+    assert len(en_data) == 362, f"Expected 362 top-level EN entries, got {len(en_data)}"
+    assert len(fa_data) == 362, f"Expected 362 top-level FA entries, got {len(fa_data)}"
+
+    def count_leaves(obj):
+        leaves = {}
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                if isinstance(v, dict):
+                    for sub_k, sub_v in v.items():
+                        leaves[f"{k}.{sub_k}"] = sub_v
+                else:
+                    leaves[k] = v
+        return leaves
+
+    en_leaves = count_leaves(en_data)
+    fa_leaves = count_leaves(fa_data)
+
+    assert len(en_leaves) == 363, f"Expected 363 EN leaf strings, got {len(en_leaves)}"
+    assert len(fa_leaves) == 363, f"Expected 363 FA leaf strings, got {len(fa_leaves)}"
+

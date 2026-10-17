@@ -56,7 +56,7 @@ class EditorStatusBar(QStatusBar):
         self.color_swatch.setStyleSheet(f"background-color: transparent; border: 1px solid {border}; border-radius: 2px;")
         c_layout.addWidget(self.color_swatch)
 
-        self.color_label = QLabel("RGB: —", self)
+        self.color_label = QLabel(t("status.rgb_empty", default="RGB: —"), self)
         self.color_label.setMinimumWidth(140)
         c_layout.addWidget(self.color_label)
 
@@ -97,7 +97,7 @@ class EditorStatusBar(QStatusBar):
         border = self._get_border_color()
         self.coord_label.setText("—")
         self.color_swatch.setStyleSheet(f"background-color: transparent; border: 1px solid {border}; border-radius: 2px;")
-        self.color_label.setText("RGB: —")
+        self.color_label.setText(t("status.rgb_empty", default="RGB: —"))
 
     def set_image_info(self, width: int, height: int, aspect_ratio: str, megapixels: str):
         self._last_info = (width, height, aspect_ratio, megapixels)
@@ -121,3 +121,6 @@ class EditorStatusBar(QStatusBar):
                 self.dim_label.setText(t("status.no_image"))
         else:
             self.dim_label.setText(t("status.no_image"))
+
+        if self._current_rgba is None:
+            self.color_label.setText(t("status.rgb_empty", default="RGB: —"))

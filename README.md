@@ -57,17 +57,18 @@
   - Smooth 200ms crossfade animation (`transition_theme`) using `QGraphicsOpacityEffect` and `QPropertyAnimation`.
 - **Localization Core Subsystem (`parto/localization/`, [`docs/LOCALIZATION.md`](docs/LOCALIZATION.md))**:
   - Independent, UI-decoupled internationalization service managing runtime locale switching, catalog discovery, translation fallback chains, and layout direction synchronization.
-  - Bundled factory catalogs for **English** (LTR) and **Persian / فارسی** (RTL), each with 191 verified translation keys and 100% key parity.
+  - Bundled factory catalogs for **English** (LTR) and **Persian / فارسی** (RTL), each with 362 top-level translation entries (363 recursively flattened leaf string values) and 100% key parity.
   - Dynamic layout direction synchronization updating `QApplication.setLayoutDirection` and top-level windows (`Qt.LeftToRight` $\leftrightarrow$ `Qt.RightToLeft`).
   - Atomic runtime switching: validates candidate catalogs prior to commit, preserving previous valid locale and text direction if candidate validation fails.
+  - Duplicate JSON key detection in `LanguageCatalogLoader` preventing silent overwrite, with directory-to-metadata identifier consistency verification.
   - Explicit persistence failure contract: default resilient mode (`strict_persistence=False`) keeps the active session in the new locale while displaying a notification toast; strict mode (`strict_persistence=True`) atomically rolls back locale and layout direction.
   - Subscriber and UI refresh isolation: exceptions in individual widget retranslation callbacks are isolated and recorded in diagnostics (`last_listener_failures`, `last_refresh_completed`) without aborting other subscribers.
   - Future Intent Subsystem integration contract via `format_intent_response()` for localized messages in background and automation tasks.
-  - *Verification Status:* Core localization logic verified with 26 unit tests passing. Qt-dependent integration test (`test_locale_state_preservation.py`) verification is pending in environments without PySide6. See [`docs/LOCALIZATION.md`](docs/LOCALIZATION.md) for full documentation.
+  - *Verification Status:* 55 Localization tests passing (29 core unit tests, 23 validation and parity tests, and 3 offscreen Qt state preservation integration tests). See [`docs/LOCALIZATION.md`](docs/LOCALIZATION.md) for full documentation.
 - **High-DPI Vector Icon System**:
   - Resolution-independent icons rendered via `QPainter` paths with canonical alias normalization.
-- **Automated QA & Test Suite (357 Test Cases)**:
-  - 357 test cases defined across 44 test files validating document state isolation, transform engines, compositing, storage adapters, brush studio properties, presets, dab generation, layers, command history, shortcuts, localization catalogs, failure rollback, state preservation, and theme palettes. (Full suite passes in headless Qt environments; pure Python/headless unit tests run without Qt).
+- **Automated QA & Test Suite (384 Test Cases)**:
+  - 384 test cases defined across 44 test files validating document state isolation, transform engines, compositing, storage adapters, brush studio properties, presets, dab generation, layers, command history, shortcuts, localization catalogs, failure rollback, state preservation, and theme palettes. (Full suite passes in headless Qt environments; pure Python/headless unit tests run without Qt).
 
 ---
 

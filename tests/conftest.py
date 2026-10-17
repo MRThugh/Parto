@@ -19,15 +19,16 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-from PySide6.QtWidgets import QApplication
-
-
 @pytest.fixture(scope="session")
 def qapp():
     """
     Session-wide headless QApplication instance.
     Safe for offscreen rendering, icon rasterization, and dialog inspection.
     """
+    try:
+        from PySide6.QtWidgets import QApplication
+    except (ImportError, Exception) as e:
+        pytest.skip(f"PySide6.QtWidgets is unavailable: {e}")
     app = QApplication.instance()
     if app is None:
         app = QApplication(["--platform", "offscreen"])
